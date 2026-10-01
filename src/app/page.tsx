@@ -1,148 +1,144 @@
 "use client";
 
 import React, { useState } from "react";
-import { Header } from "@/components/Header";
-import { WeeklyStatsCard } from "@/components/WeeklyStatsCard";
-import { WorkoutSessionCard } from "@/components/WorkoutSessionCard";
-import { ChatLoggerBanner } from "@/components/ChatLoggerBanner";
+import { INITIAL_WORKOUTS, ATHLETE_NAME, TRAINER_NAME } from "@/data/workouts";
 import { 
-  ATHLETE_PROFILE, 
-  INITIAL_WORKOUTS, 
-  getWeeklyStats 
-} from "@/data/workouts";
-import { 
-  Funnel, 
-  Sparkle, 
-  ShieldCheck, 
-  Flame 
+  Barbell, 
+  Footprints, 
+  ShareNetwork, 
+  Check, 
+  ChatCircleText, 
+  CircleDashed 
 } from "@phosphor-icons/react";
 
-export default function WorkoutDashboardPage() {
-  const [workouts, setWorkouts] = useState(INITIAL_WORKOUTS);
-  const [isTrainerView, setIsTrainerView] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<string>("all");
+export default function WorkoutListPage() {
+  const [workouts] = useState(INITIAL_WORKOUTS);
+  const [copied, setCopied] = useState(false);
 
-  const weeklyStats = getWeeklyStats(workouts);
-
-  const filteredWorkouts = workouts.filter((w) => {
-    if (filterCategory === "all") return true;
-    return w.category === filterCategory;
-  });
+  const handleCopyLink = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-lime-400 selection:text-zinc-950">
-      {/* Top Header */}
-      <Header
-        profile={ATHLETE_PROFILE}
-        isTrainerView={isTrainerView}
-        onToggleTrainerView={() => setIsTrainerView(!isTrainerView)}
-      />
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
-        {/* Banner if Trainer View is Active */}
-        {isTrainerView && (
-          <div className="mb-6 p-4 rounded-xl bg-lime-400/10 border border-lime-400/30 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-lime-400 font-medium">
-              <ShieldCheck size={18} weight="bold" />
-              <span>
-                <strong>Coach View Enabled:</strong> Reviewing athlete Robin's weekly interval splits, volume adherence, and form metrics.
-              </span>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800">
+      {/* Top minimal bar */}
+      <header className="border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold text-zinc-100 tracking-tight">
+                {ATHLETE_NAME}'s Workout Log
+              </h1>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             </div>
-            <button
-              onClick={() => setIsTrainerView(false)}
-              className="text-zinc-400 hover:text-zinc-200 underline font-mono shrink-0"
-            >
-              Exit Coach View
-            </button>
-          </div>
-        )}
-
-        {/* Weekly Adherence & Stats Card */}
-        <WeeklyStatsCard stats={weeklyStats} isTrainerView={isTrainerView} />
-
-        {/* Session Feed Controls & Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-100">
-              Training Logbook
-            </h2>
-            <span className="font-mono text-xs text-zinc-400">
-              ({filteredWorkouts.length} sessions logged)
-            </span>
+            <p className="text-xs text-zinc-400">
+              Shared with Coach {TRAINER_NAME}
+            </p>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
-            <button
-              type="button"
-              onClick={() => setFilterCategory("all")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                filterCategory === "all"
-                  ? "bg-zinc-800 text-white font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterCategory("hybrid")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                filterCategory === "hybrid"
-                  ? "bg-zinc-800 text-lime-400 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Interval & Hybrid
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterCategory("strength")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                filterCategory === "strength"
-                  ? "bg-zinc-800 text-amber-400 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Strength
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterCategory("cardio")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                filterCategory === "cardio"
-                  ? "bg-zinc-800 text-emerald-400 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Cardio
-            </button>
-          </div>
+          <button
+            onClick={handleCopyLink}
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 text-zinc-300 border border-zinc-800 hover:border-zinc-700 hover:text-white transition-colors cursor-pointer"
+          >
+            {copied ? (
+              <>
+                <Check size={14} className="text-emerald-400" weight="bold" />
+                <span className="text-emerald-400 font-mono">Link Copied</span>
+              </>
+            ) : (
+              <>
+                <ShareNetwork size={14} />
+                <span>Share Link</span>
+              </>
+            )}
+          </button>
         </div>
+      </header>
 
-        {/* Sessions List */}
+      {/* Main Content: Clean List */}
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8">
         <div className="space-y-6">
-          {filteredWorkouts.map((session, index) => (
-            <WorkoutSessionCard
-              key={session.id}
-              session={session}
-              isTrainerView={isTrainerView}
-              defaultExpanded={index === 0}
-            />
+          {workouts.map((workout) => (
+            <article
+              key={workout.id}
+              className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-5 hover:border-zinc-700/80 transition-colors"
+            >
+              {/* Date & Title */}
+              <div className="flex items-baseline justify-between border-b border-zinc-800/60 pb-3 mb-3.5">
+                <h2 className="text-base font-semibold text-zinc-100">
+                  {workout.title}
+                </h2>
+                <time className="text-xs font-mono text-zinc-400">
+                  {workout.date}
+                </time>
+              </div>
+
+              {/* Items List */}
+              <ul className="space-y-2.5">
+                {workout.items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-start gap-3 text-sm"
+                  >
+                    <span className="mt-0.5 p-1 rounded bg-zinc-800/80 text-zinc-300 shrink-0">
+                      {item.type === "cardio" ? (
+                        <Footprints size={15} className="text-emerald-400" />
+                      ) : item.type === "strength" ? (
+                        <Barbell size={15} className="text-amber-400" />
+                      ) : (
+                        <CircleDashed size={15} className="text-zinc-400" />
+                      )}
+                    </span>
+                    <div className="flex-1">
+                      <span className="font-medium text-zinc-200 mr-2">
+                        {item.name}:
+                      </span>
+                      <span className="text-zinc-300 font-mono text-xs sm:text-sm">
+                        {item.details}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Notes */}
+              {(workout.notes || workout.coachNote) && (
+                <div className="mt-4 pt-3 border-t border-zinc-800/50 space-y-2 text-xs">
+                  {workout.notes && (
+                    <p className="text-zinc-400">
+                      <strong className="text-zinc-300 font-medium">Note:</strong>{" "}
+                      {workout.notes}
+                    </p>
+                  )}
+                  {workout.coachNote && (
+                    <p className="text-zinc-300 flex items-start gap-1.5 bg-zinc-950/60 border border-zinc-800/70 p-2.5 rounded-lg">
+                      <ChatCircleText size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong className="text-emerald-400 font-medium font-mono text-[11px] block">
+                          Coach {TRAINER_NAME}:
+                        </strong>
+                        {workout.coachNote}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
+            </article>
           ))}
         </div>
 
-        {/* Conversational Assistant Logging Banner */}
-        <ChatLoggerBanner />
+        {/* Minimal Footer Cue */}
+        <div className="mt-12 text-center border-t border-zinc-900 pt-6">
+          <p className="text-xs font-mono text-zinc-400">
+            Tell Antigravity in chat to add any workout to your list.
+          </p>
+        </div>
       </main>
-
-      {/* Minimalist Footer */}
-      <footer className="border-t border-zinc-800/60 py-6 text-center text-xs font-mono text-zinc-400">
-        <p>
-          Workout Tracker • Updated via AI Chat • Athlete: Robin • Coach: Marcus Vance
-        </p>
-      </footer>
     </div>
   );
 }
