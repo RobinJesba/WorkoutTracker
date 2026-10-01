@@ -14,24 +14,33 @@ export type MuscleGroup =
   | "full-body";
 
 interface MuscleIconProps {
-  muscleGroup: MuscleGroup;
+  targetMuscles?: string[];
+  muscleGroup?: MuscleGroup | string;
   size?: number;
   className?: string;
 }
 
 export const MuscleIcon: React.FC<MuscleIconProps> = ({
-  muscleGroup,
+  targetMuscles = [],
+  muscleGroup = "",
   size = 28,
   className = "",
 }) => {
-  // Determine highlighted parts based on muscleGroup
-  const isQuadsActive = muscleGroup === "quads" || muscleGroup === "legs" || muscleGroup === "full-body";
-  const isCalvesActive = muscleGroup === "calves" || muscleGroup === "legs" || muscleGroup === "full-body";
-  const isGlutesActive = muscleGroup === "glutes" || muscleGroup === "legs" || muscleGroup === "full-body";
-  const isChestActive = muscleGroup === "chest" || muscleGroup === "full-body";
-  const isBackActive = muscleGroup === "back" || muscleGroup === "full-body";
-  const isCoreActive = muscleGroup === "core" || muscleGroup === "full-body";
-  const isArmsActive = muscleGroup === "arms" || muscleGroup === "full-body";
+  // Normalize checking from targetMuscles tags first, falling back to muscleGroup
+  const hasMuscle = (pattern: RegExp) => {
+    if (targetMuscles && targetMuscles.length > 0) {
+      return targetMuscles.some((m) => pattern.test(m));
+    }
+    return pattern.test(muscleGroup);
+  };
+
+  const isQuadsActive = hasMuscle(/quad/i) || muscleGroup === "legs" || muscleGroup === "full-body";
+  const isCalvesActive = hasMuscle(/calf|calves/i) || (muscleGroup === "legs" && hasMuscle(/calf/i)) || muscleGroup === "full-body";
+  const isChestActive = hasMuscle(/chest|pec/i) || muscleGroup === "full-body";
+  const isBackActive = hasMuscle(/back|lat/i) || muscleGroup === "full-body";
+  const isCoreActive = hasMuscle(/core|abs|abdominal|stomach/i) || muscleGroup === "core" || muscleGroup === "full-body";
+  const isArmsActive = hasMuscle(/arm|bicep|tricep/i) || muscleGroup === "arms" || muscleGroup === "full-body";
+  const isShouldersActive = hasMuscle(/shoulder|delt/i) || muscleGroup === "full-body";
 
   const activeColor = "#34d399"; // emerald-400
   const activeGlow = "drop-shadow(0 0 3px rgba(52, 211, 153, 0.6))";
@@ -46,7 +55,7 @@ export const MuscleIcon: React.FC<MuscleIconProps> = ({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={`shrink-0 ${className}`}
-      aria-label={`Target muscle: ${muscleGroup}`}
+      aria-label={`Target muscles: ${targetMuscles.join(", ") || muscleGroup}`}
     >
       {/* Head */}
       <circle cx="18" cy="5" r="3.5" fill={inactiveHead} />
@@ -54,19 +63,18 @@ export const MuscleIcon: React.FC<MuscleIconProps> = ({
       {/* Neck */}
       <rect x="16.5" y="8.5" width="3" height="2" rx="0.5" fill={inactiveHead} />
 
-      {/* Shoulders & Torso base */}
       {/* Left Shoulder & Arm */}
       <path
         d="M13 11 C11 11, 9 13, 8 16 L6.5 24 C6.2 25.5, 7.5 26.5, 8.5 25.5 L10 20 L11.5 13 Z"
-        fill={isArmsActive ? activeColor : inactiveColor}
-        style={{ filter: isArmsActive ? activeGlow : undefined }}
+        fill={isArmsActive || isShouldersActive ? activeColor : inactiveColor}
+        style={{ filter: isArmsActive || isShouldersActive ? activeGlow : undefined }}
       />
 
       {/* Right Shoulder & Arm */}
       <path
         d="M23 11 C25 11, 27 13, 28 16 L29.5 24 C29.8 25.5, 28.5 26.5, 27.5 25.5 L26 20 L24.5 13 Z"
-        fill={isArmsActive ? activeColor : inactiveColor}
-        style={{ filter: isArmsActive ? activeGlow : undefined }}
+        fill={isArmsActive || isShouldersActive ? activeColor : inactiveColor}
+        style={{ filter: isArmsActive || isShouldersActive ? activeGlow : undefined }}
       />
 
       {/* Chest (Upper Torso) */}
@@ -76,18 +84,17 @@ export const MuscleIcon: React.FC<MuscleIconProps> = ({
         style={{ filter: isChestActive ? activeGlow : undefined }}
       />
 
-      {/* Core / Abs (Mid Torso) */}
+      {/* Core / Abs (Mid Torso) - ONLY active if core/abs is explicitly targeted */}
       <path
         d="M13.5 18.5 H22.5 L21.5 24 H14.5 L13.5 18.5 Z"
         fill={isCoreActive ? activeColor : inactiveColor}
         style={{ filter: isCoreActive ? activeGlow : undefined }}
       />
 
-      {/* Pelvis / Hips */}
+      {/* Pelvis / Hips (Always neutral dark to prevent accidental lower stomach glow) */}
       <path
         d="M14 24.5 H22 L21.5 27.5 H14.5 L14 24.5 Z"
-        fill={isGlutesActive ? activeColor : inactiveColor}
-        style={{ filter: isGlutesActive ? activeGlow : undefined }}
+        fill={inactiveColor}
       />
 
       {/* Left Upper Leg (Thigh / Quad) */}

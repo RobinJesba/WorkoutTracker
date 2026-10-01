@@ -19,7 +19,7 @@ export const INITIAL_WORKOUTS: WorkoutEntry[] = [
         id: "item-1-2",
         name: "Bodyweight Squats",
         muscleGroup: "quads",
-        targetMuscles: ["Quadriceps", "Glutes"],
+        targetMuscles: ["Quads", "Glutes"],
         details: "3 sets × 15 reps",
       },
     ],
