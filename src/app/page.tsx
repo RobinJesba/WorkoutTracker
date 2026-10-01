@@ -1,69 +1,148 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState } from "react";
+import { Header } from "@/components/Header";
+import { WeeklyStatsCard } from "@/components/WeeklyStatsCard";
+import { WorkoutSessionCard } from "@/components/WorkoutSessionCard";
+import { ChatLoggerBanner } from "@/components/ChatLoggerBanner";
+import { 
+  ATHLETE_PROFILE, 
+  INITIAL_WORKOUTS, 
+  getWeeklyStats 
+} from "@/data/workouts";
+import { 
+  Funnel, 
+  Sparkle, 
+  ShieldCheck, 
+  Flame 
+} from "@phosphor-icons/react";
+
+export default function WorkoutDashboardPage() {
+  const [workouts, setWorkouts] = useState(INITIAL_WORKOUTS);
+  const [isTrainerView, setIsTrainerView] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+
+  const weeklyStats = getWeeklyStats(workouts);
+
+  const filteredWorkouts = workouts.filter((w) => {
+    if (filterCategory === "all") return true;
+    return w.category === filterCategory;
+  });
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-lime-400 selection:text-zinc-950">
+      {/* Top Header */}
+      <Header
+        profile={ATHLETE_PROFILE}
+        isTrainerView={isTrainerView}
+        onToggleTrainerView={() => setIsTrainerView(!isTrainerView)}
+      />
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
+        {/* Banner if Trainer View is Active */}
+        {isTrainerView && (
+          <div className="mb-6 p-4 rounded-xl bg-lime-400/10 border border-lime-400/30 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-lime-400 font-medium">
+              <ShieldCheck size={18} weight="bold" />
+              <span>
+                <strong>Coach View Enabled:</strong> Reviewing athlete Robin's weekly interval splits, volume adherence, and form metrics.
+              </span>
+            </div>
+            <button
+              onClick={() => setIsTrainerView(false)}
+              className="text-zinc-400 hover:text-zinc-200 underline font-mono shrink-0"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Exit Coach View
+            </button>
+          </div>
+        )}
+
+        {/* Weekly Adherence & Stats Card */}
+        <WeeklyStatsCard stats={weeklyStats} isTrainerView={isTrainerView} />
+
+        {/* Session Feed Controls & Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-100">
+              Training Logbook
+            </h2>
+            <span className="font-mono text-xs text-zinc-400">
+              ({filteredWorkouts.length} sessions logged)
+            </span>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
+            <button
+              type="button"
+              onClick={() => setFilterCategory("all")}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                filterCategory === "all"
+                  ? "bg-zinc-800 text-white font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterCategory("hybrid")}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                filterCategory === "hybrid"
+                  ? "bg-zinc-800 text-lime-400 font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Interval & Hybrid
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterCategory("strength")}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                filterCategory === "strength"
+                  ? "bg-zinc-800 text-amber-400 font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Strength
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterCategory("cardio")}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+                filterCategory === "cardio"
+                  ? "bg-zinc-800 text-emerald-400 font-semibold"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Cardio
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+
+        {/* Sessions List */}
+        <div className="space-y-6">
+          {filteredWorkouts.map((session, index) => (
+            <WorkoutSessionCard
+              key={session.id}
+              session={session}
+              isTrainerView={isTrainerView}
+              defaultExpanded={index === 0}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          ))}
         </div>
+
+        {/* Conversational Assistant Logging Banner */}
+        <ChatLoggerBanner />
       </main>
+
+      {/* Minimalist Footer */}
+      <footer className="border-t border-zinc-800/60 py-6 text-center text-xs font-mono text-zinc-400">
+        <p>
+          Workout Tracker • Updated via AI Chat • Athlete: Robin • Coach: Marcus Vance
+        </p>
+      </footer>
     </div>
   );
 }
