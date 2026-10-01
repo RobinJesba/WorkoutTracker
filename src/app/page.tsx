@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
 import { 
-  Barbell, 
-  Footprints, 
+  PersonSimpleRun, 
+  PersonSimple, 
   CircleDashed 
 } from "@phosphor-icons/react";
 
@@ -23,7 +23,7 @@ export default function WorkoutListPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           </div>
           <span className="text-xs font-mono text-zinc-400">
-            {workouts.length} entries
+            {workouts.length} {workouts.length === 1 ? "entry" : "entries"}
           </span>
         </div>
       </header>
@@ -47,19 +47,19 @@ export default function WorkoutListPage() {
               </div>
 
               {/* Items List */}
-              <ul className="space-y-2.5">
+              <ul className="space-y-3">
                 {workout.items.map((item) => (
                   <li
                     key={item.id}
                     className="flex items-start gap-3 text-sm"
                   >
-                    <span className="mt-0.5 p-1 rounded bg-zinc-800/80 text-zinc-300 shrink-0">
+                    <span className="mt-0.5 p-1.5 rounded bg-zinc-800/80 text-zinc-300 shrink-0">
                       {item.type === "cardio" ? (
-                        <Footprints size={15} className="text-emerald-400" />
+                        <PersonSimpleRun size={16} className="text-emerald-400" weight="bold" />
                       ) : item.type === "strength" ? (
-                        <Barbell size={15} className="text-amber-400" />
+                        <PersonSimple size={16} className="text-amber-400" weight="bold" />
                       ) : (
-                        <CircleDashed size={15} className="text-zinc-400" />
+                        <CircleDashed size={16} className="text-zinc-400" />
                       )}
                     </span>
                     <div className="flex-1">
