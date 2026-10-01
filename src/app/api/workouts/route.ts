@@ -9,13 +9,27 @@ import { WorkoutEntry } from "@/types/workout";
 
 export const dynamic = "force-dynamic";
 
-// Simple API Key security for mutating data (Create, Update, Delete)
-function isAuthorized(req: NextRequest): boolean {
-  const secretKey = process.env.WORKOUT_API_KEY || "robin-tracker-secret";
-  const providedKey = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
-  
-  // If no env is set yet, we allow our default secret
-  return providedKey === secretKey;
+// Strict API Key authorization
+async function isAuthorized(req: NextRequest): Promise<boolean> {
+  let secretKey = process.env.WORKOUT_API_KEY;
+
+  if (!secretKey) {
+    try {
+      const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+      const { env } = (await getCloudflareContext({ async: true })) as any;
+      secretKey = env?.WORKOUT_API_KEY;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!secretKey) return false;
+
+  const providedKey =
+    req.headers.get("x-api-key") ||
+    req.headers.get("authorization")?.replace("Bearer ", "");
+
+  return Boolean(providedKey && providedKey === secretKey);
 }
 
 // 1. GET: Read all workouts (with Edge Caching headers)
@@ -28,7 +42,6 @@ export async function GET() {
       {
         status: 200,
         headers: {
-          // Cloudflare Edge Cache: cache for 60s, stale-while-revalidate for 24 hours
           "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
         },
       }
@@ -44,8 +57,8 @@ export async function GET() {
 // 2. POST: Create a new workout
 export async function POST(req: NextRequest) {
   try {
-    if (!isAuthorized(req)) {
-      return NextResponse.json({ error: "Unauthorized. Provide valid x-api-key." }, { status: 401 });
+    if (!(await isAuthorized(req))) {
+      return NextResponse.json({ error: "Unauthorized. Valid x-api-key required." }, { status: 401 });
     }
 
     const body = (await req.json()) as WorkoutEntry;
@@ -66,8 +79,8 @@ export async function POST(req: NextRequest) {
 // 3. PUT: Update an existing workout
 export async function PUT(req: NextRequest) {
   try {
-    if (!isAuthorized(req)) {
-      return NextResponse.json({ error: "Unauthorized. Provide valid x-api-key." }, { status: 401 });
+    if (!(await isAuthorized(req))) {
+      return NextResponse.json({ error: "Unauthorized. Valid x-api-key required." }, { status: 401 });
     }
 
     const body = (await req.json()) as WorkoutEntry;
@@ -88,8 +101,8 @@ export async function PUT(req: NextRequest) {
 // 4. DELETE: Delete a workout
 export async function DELETE(req: NextRequest) {
   try {
-    if (!isAuthorized(req)) {
-      return NextResponse.json({ error: "Unauthorized. Provide valid x-api-key." }, { status: 401 });
+    if (!(await isAuthorized(req))) {
+      return NextResponse.json({ error: "Unauthorized. Valid x-api-key required." }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
