@@ -1,7 +1,10 @@
+import { MuscleGroup } from "@/components/MuscleIcon";
+
 export interface WorkoutItem {
   id: string;
   name: string;
-  type: "cardio" | "strength" | "other";
+  muscleGroup: MuscleGroup;
+  targetMuscles: string[]; // e.g. ["Quadriceps", "Glutes"]
   details: string;
 }
 
@@ -10,6 +13,4 @@ export interface WorkoutEntry {
   date: string;
   title: string;
   items: WorkoutItem[];
-  notes?: string;
-  coachNote?: string;
 }

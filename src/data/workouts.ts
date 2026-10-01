@@ -11,13 +11,15 @@ export const INITIAL_WORKOUTS: WorkoutEntry[] = [
       {
         id: "item-1-1",
         name: "Running Intervals",
-        type: "cardio",
+        muscleGroup: "legs",
+        targetMuscles: ["Quads", "Calves"],
         details: "5 sets: 2 mins run @ 12 km/h + 2 mins walk @ 3 km/h (0% incline)",
       },
       {
         id: "item-1-2",
         name: "Bodyweight Squats",
-        type: "strength",
+        muscleGroup: "quads",
+        targetMuscles: ["Quadriceps", "Glutes"],
         details: "3 sets × 15 reps",
       },
     ],
