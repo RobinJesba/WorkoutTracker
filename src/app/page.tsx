@@ -84,13 +84,6 @@ export default function WorkoutListPage() {
             </article>
           ))}
         </div>
-
-        {/* Minimal Footer Cue */}
-        <div className="mt-12 text-center border-t border-zinc-900 pt-6">
-          <p className="text-xs font-mono text-zinc-400">
-            Tell Antigravity in chat to add any workout to your list.
-          </p>
-        </div>
       </main>
     </div>
   );
