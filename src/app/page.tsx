@@ -104,11 +104,11 @@ export default function WorkoutListPage() {
                 {workout.items.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-zinc-950/60 border border-zinc-800/60 hover:border-zinc-700/60 transition-colors"
+                    className="flex items-center gap-3.5 p-3 rounded-lg bg-zinc-950/60 border border-zinc-800/60 hover:border-zinc-700/60 transition-colors"
                   >
                     {/* Anatomical Target Muscle Silhouette Icon */}
                     <div 
-                      className="p-1 sm:p-1.5 rounded-md bg-zinc-900 border border-zinc-800/80 flex items-center justify-center shrink-0 mt-0.5"
+                      className="p-1 sm:p-1.5 rounded-md bg-zinc-900 border border-zinc-800/80 flex items-center justify-center shrink-0"
                       title={`Targeted muscles: ${item.targetMuscles?.join(", ") || item.muscleGroup}`}
                     >
                       <MuscleIcon 
