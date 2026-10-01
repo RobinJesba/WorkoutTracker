@@ -1,7 +1,6 @@
 import { WorkoutEntry } from "@/types/workout";
 
 export const ATHLETE_NAME = "Robin";
-export const TRAINER_NAME = "Marcus";
 
 export const INITIAL_WORKOUTS: WorkoutEntry[] = [
   {
@@ -22,8 +21,6 @@ export const INITIAL_WORKOUTS: WorkoutEntry[] = [
         details: "3 sets × 15 reps",
       },
     ],
-    notes: "Felt strong throughout all 5 interval pushes.",
-    coachNote: "Solid pace on the 12 km/h runs. Next session let's keep the same interval structure.",
   },
   {
     id: "workout-2",
@@ -62,6 +59,5 @@ export const INITIAL_WORKOUTS: WorkoutEntry[] = [
         details: "5 km steady pace (35 mins)",
       },
     ],
-    notes: "Easy aerobic pace, kept heart rate controlled.",
   },
 ];

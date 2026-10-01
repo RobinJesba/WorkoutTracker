@@ -1,62 +1,30 @@
 "use client";
 
 import React, { useState } from "react";
-import { INITIAL_WORKOUTS, ATHLETE_NAME, TRAINER_NAME } from "@/data/workouts";
+import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
 import { 
   Barbell, 
   Footprints, 
-  ShareNetwork, 
-  Check, 
-  ChatCircleText, 
   CircleDashed 
 } from "@phosphor-icons/react";
 
 export default function WorkoutListPage() {
   const [workouts] = useState(INITIAL_WORKOUTS);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyLink = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800">
       {/* Top minimal bar */}
       <header className="border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-zinc-100 tracking-tight">
-                {ATHLETE_NAME}'s Workout Log
-              </h1>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            </div>
-            <p className="text-xs text-zinc-400">
-              Shared with Coach {TRAINER_NAME}
-            </p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold text-zinc-100 tracking-tight">
+              {ATHLETE_NAME}'s Workout Log
+            </h1>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           </div>
-
-          <button
-            onClick={handleCopyLink}
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 text-zinc-300 border border-zinc-800 hover:border-zinc-700 hover:text-white transition-colors cursor-pointer"
-          >
-            {copied ? (
-              <>
-                <Check size={14} className="text-emerald-400" weight="bold" />
-                <span className="text-emerald-400 font-mono">Link Copied</span>
-              </>
-            ) : (
-              <>
-                <ShareNetwork size={14} />
-                <span>Share Link</span>
-              </>
-            )}
-          </button>
+          <span className="text-xs font-mono text-zinc-400">
+            {workouts.length} entries
+          </span>
         </div>
       </header>
 
@@ -105,29 +73,6 @@ export default function WorkoutListPage() {
                   </li>
                 ))}
               </ul>
-
-              {/* Notes */}
-              {(workout.notes || workout.coachNote) && (
-                <div className="mt-4 pt-3 border-t border-zinc-800/50 space-y-2 text-xs">
-                  {workout.notes && (
-                    <p className="text-zinc-400">
-                      <strong className="text-zinc-300 font-medium">Note:</strong>{" "}
-                      {workout.notes}
-                    </p>
-                  )}
-                  {workout.coachNote && (
-                    <p className="text-zinc-300 flex items-start gap-1.5 bg-zinc-950/60 border border-zinc-800/70 p-2.5 rounded-lg">
-                      <ChatCircleText size={15} className="text-emerald-400 shrink-0 mt-0.5" />
-                      <span>
-                        <strong className="text-emerald-400 font-medium font-mono text-[11px] block">
-                          Coach {TRAINER_NAME}:
-                        </strong>
-                        {workout.coachNote}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              )}
             </article>
           ))}
         </div>
