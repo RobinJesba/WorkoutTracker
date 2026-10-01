@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "workout-tracker",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": ".worker-next",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workout-tracker-db",
+      "database_id": "5ad4c992-cb18-46e0-a809-1eba3a01581e"
+    }
+  ]
+}

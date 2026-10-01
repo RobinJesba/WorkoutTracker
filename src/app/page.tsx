@@ -1,11 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
 import { MuscleIcon } from "@/components/MuscleIcon";
 
 export default function WorkoutListPage() {
-  const [workouts] = useState(INITIAL_WORKOUTS);
+  const [workouts, setWorkouts] = useState(INITIAL_WORKOUTS);
+
+  useEffect(() => {
+    fetch("/api/workouts")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.workouts && data.workouts.length > 0) {
+          setWorkouts(data.workouts);
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully to initial state
+      });
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800">
