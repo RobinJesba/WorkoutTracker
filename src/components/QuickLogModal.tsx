@@ -186,12 +186,26 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <label className="block text-xs font-mono text-zinc-400 mb-1.5">
               Workout Date
             </label>
-            <div className="relative">
+            <div className="relative group">
+              {/* Visually displays the exact "Oct 3, 2026" format */}
+              <div className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 group-hover:border-zinc-700 transition-colors">
+                <span className="font-mono text-zinc-100 font-medium tracking-tight">
+                  {displayDate}
+                </span>
+                <svg className="w-4 h-4 text-emerald-400/80" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+              </div>
+
+              {/* Invisible native date picker over the entire box to trigger calendar */}
               <input
                 type="date"
                 value={selectedDateIso}
-                onChange={(e) => setSelectedDateIso(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 [color-scheme:dark] transition-colors"
+                onChange={(e) => {
+                  if (e.target.value) setSelectedDateIso(e.target.value);
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full [color-scheme:dark]"
+                title="Select date"
               />
             </div>
             {existingWorkoutForDate && (
