@@ -1,9 +1,10 @@
 import wgerExercisesData from "@/data/wger/exercises.json";
 import datasetExercisesData from "@/data/exercises-dataset/exercises.json";
+import { CANONICAL_EXERCISES, findCanonicalExercise } from "@/data/canonicalExercises";
 
 export interface UnifiedExercise {
   id: string;
-  source: "wger" | "exercises-dataset";
+  source: "wger" | "exercises-dataset" | "canonical";
   name: string;
   category: string;
   equipment?: string;
@@ -36,17 +37,16 @@ export function normalizeMuscle(muscle: string): string {
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
-// Build indexed database
+// Build indexed database with canonical fundamentals prioritized first
 export const ALL_EXERCISES: UnifiedExercise[] = [
-  ...datasetExercisesData.map((ex) => ({
-    id: `ed-${ex.id}`,
-    source: "exercises-dataset" as const,
-    name: ex.name,
-    category: ex.category || ex.bodyPart,
-    equipment: ex.equipment,
-    primaryMuscles: ex.target ? [normalizeMuscle(ex.target)] : [],
-    secondaryMuscles: (ex.secondaryMuscles || []).map(normalizeMuscle),
-    instructions: ex.instructions || [],
+  ...CANONICAL_EXERCISES.map((c) => ({
+    id: `canonical-${c.canonicalName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+    source: "canonical" as const,
+    name: c.canonicalName,
+    category: c.muscleGroup,
+    equipment: undefined,
+    primaryMuscles: c.primaryMuscles,
+    secondaryMuscles: c.secondaryMuscles,
   })),
   ...wgerExercisesData.map((ex) => ({
     id: `wger-${ex.id}`,
@@ -58,27 +58,123 @@ export const ALL_EXERCISES: UnifiedExercise[] = [
     secondaryMuscles: (ex.secondaryMuscles || []).map(normalizeMuscle),
     instructions: undefined,
   })),
+  ...datasetExercisesData.map((ex) => ({
+    id: `ed-${ex.id}`,
+    source: "exercises-dataset" as const,
+    name: ex.name,
+    category: ex.category || ex.bodyPart,
+    equipment: ex.equipment,
+    primaryMuscles: ex.target ? [normalizeMuscle(ex.target)] : [],
+    secondaryMuscles: (ex.secondaryMuscles || []).map(normalizeMuscle),
+    instructions: ex.instructions || [],
+  })),
 ];
 
 /**
- * Fast search across the combined 2,190+ exercise database.
+ * Fast search across the combined exercise database with anti-collision movement rules.
  */
 export function searchUnifiedExercises(query: string, limit = 10): UnifiedExercise[] {
   const q = query.toLowerCase().trim();
   if (!q) return [];
 
-  const tokens = q.split(/\s+/);
+  // 1. Direct canonical check
+  const canonical = findCanonicalExercise(q);
+  if (canonical) {
+    const canonicalMatch: UnifiedExercise = {
+      id: `canonical-${canonical.canonicalName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+      source: "canonical",
+      name: canonical.canonicalName,
+      category: canonical.muscleGroup,
+      equipment: undefined,
+      primaryMuscles: canonical.primaryMuscles,
+      secondaryMuscles: canonical.secondaryMuscles,
+    };
+    return [canonicalMatch];
+  }
+
+  const queryTokens = q.split(/\s+/).filter((t) => t.length > 0);
+  const qNorm = q.replace(/[^a-z0-9]/g, "");
+
+  // Movement category intention in query
+  const qHasSquat = /\bsquats?\b/i.test(q);
+  const qHasLunge = /\blunges?\b/i.test(q);
+  const qHasDeadlift = /\bdeadlifts?\b|\brdl\b/i.test(q);
+  const qHasPress = /\bpress(es)?\b|\bpush-?ups?\b|\bdips?\b/i.test(q);
+  const qHasPull = /\bpulls?\b|\bpulldowns?\b|\brows?\b|\bchin-?ups?\b/i.test(q);
+  const qHasCurl = /\bcurls?\b/i.test(q);
 
   const scored = ALL_EXERCISES.map((ex) => {
     const name = ex.name.toLowerCase();
+    const nameNorm = name.replace(/[^a-z0-9]/g, "");
     let score = 0;
 
-    if (name === q) score += 100;
-    else if (name.startsWith(q)) score += 50;
-    else if (name.includes(q)) score += 30;
+    // Exact matches
+    if (name === q) score += 300;
+    else if (nameNorm === qNorm) score += 280;
+    else if (name.startsWith(q + " ") || name.startsWith(q + "-")) score += 120;
+    else if (name.includes(q)) score += 60;
 
-    for (const token of tokens) {
-      if (name.includes(token)) score += 10;
+    // Canonical source bonus
+    if (ex.id.startsWith("canonical-")) score += 80;
+
+    // Token matches with whole-word matching
+    let matchedTokens = 0;
+    for (const token of queryTokens) {
+      const regex = new RegExp(`\\b${token}\\b`, "i");
+      if (regex.test(name)) {
+        score += 25;
+        matchedTokens++;
+      } else if (name.includes(token)) {
+        score += 10;
+      }
+    }
+
+    if (matchedTokens === queryTokens.length) {
+      score += 40; // All query words matched exactly
+    }
+
+    // Word count / length penalty (prevents matching 2-word query to 5-word compound)
+    const nameWords = name.split(/\s+/);
+    const lengthDiff = Math.abs(nameWords.length - queryTokens.length);
+    score -= lengthDiff * 6;
+
+    // Movement collision anti-patterns
+    // 1. If searching for SQUAT, heavily penalize exercises with ROW, CURL, PRESS, JERK
+    if (qHasSquat) {
+      if (/\brow(ing|s)?\b/i.test(name)) score -= 300;
+      if (/\bjerk\b/i.test(name)) score -= 200;
+      if (/\bcurl(s)?\b/i.test(name)) score -= 250;
+      if (/\bpress(es)?\b/i.test(name) && !/\bsquat\s+press\b/i.test(name)) score -= 150;
+      // Squat must NOT have back or chest as primary
+      if (ex.primaryMuscles.includes("Upper Back") || ex.primaryMuscles.includes("Lats") || ex.primaryMuscles.includes("Chest")) {
+        score -= 400;
+      }
+    }
+
+    // 2. If searching for LUNGE, penalize ROW, CURL, PRESS
+    if (qHasLunge) {
+      if (/\brow(ing|s)?\b/i.test(name)) score -= 300;
+      if (/\bcurl(s)?\b/i.test(name)) score -= 250;
+      if (ex.primaryMuscles.includes("Upper Back") || ex.primaryMuscles.includes("Lats") || ex.primaryMuscles.includes("Chest")) {
+        score -= 400;
+      }
+    }
+
+    // 3. If searching for PRESS / PUSH, penalize PULL / ROW
+    if (qHasPress && !qHasPull) {
+      if (/\brow(ing|s)?\b|\bpulldowns?\b/i.test(name)) score -= 300;
+    }
+
+    // 4. If searching for PULL / ROW, penalize PRESS / PUSH
+    if (qHasPull && !qHasPress) {
+      if (/\bpress(es)?\b|\bpush-?ups?\b/i.test(name)) score -= 300;
+    }
+
+    // 5. If searching for DEADLIFT, must not be bicep/tricep/chest
+    if (qHasDeadlift) {
+      if (ex.primaryMuscles.includes("Chest") || ex.primaryMuscles.includes("Biceps") || ex.primaryMuscles.includes("Triceps")) {
+        score -= 400;
+      }
     }
 
     return { ex, score };
@@ -95,6 +191,22 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
  * Find best matching exercise by name.
  */
 export function findUnifiedExercise(query: string): UnifiedExercise | undefined {
+  if (!query) return undefined;
+
+  // 1. Direct canonical check
+  const canonical = findCanonicalExercise(query);
+  if (canonical) {
+    return {
+      id: `canonical-${canonical.canonicalName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+      source: "canonical",
+      name: canonical.canonicalName,
+      category: canonical.muscleGroup,
+      equipment: undefined,
+      primaryMuscles: canonical.primaryMuscles,
+      secondaryMuscles: canonical.secondaryMuscles,
+    };
+  }
+
   const matches = searchUnifiedExercises(query, 1);
   return matches.length > 0 ? matches[0] : undefined;
 }

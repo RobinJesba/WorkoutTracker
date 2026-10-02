@@ -31,10 +31,11 @@ Core: Abs, Core
 ${EXERCISE_CATALOG_TEXT}
 
 ### GUIDELINES:
-1. Match each exercise to the closest EXACT name from the official catalog whenever possible, setting "isCustom": false.
-2. If an exercise is a novel, unlisted, or custom variation (e.g., stability ball, landmine, unusual unilateral exercise), set "isCustom": true, provide a clean descriptive name, and choose 1 (or 2) primaryMuscles and 1 or 2 secondaryMuscles strictly from the APPROVED LIST.
-3. Format the "details" string cleanly based on Robin's past logs (see examples).
-4. Infer a short, descriptive workout title (e.g. "Upper Body Pull & Push", "Leg Day & Intervals", "Full Body Circuit").
+1. Match each exercise to the closest standard name from the official catalog, setting "isCustom": false.
+2. If an exercise is a novel, unlisted, or custom variation (e.g., stability ball, landmine, unusual unilateral exercise), set "isCustom": true, and provide a clean descriptive name.
+3. For EVERY exercise (both catalog and custom), ALWAYS select 1 or 2 primaryMuscles and 0 to 3 secondaryMuscles strictly from the APPROVED MUSCLE LIST.
+4. Format the "details" string cleanly based on Robin's past logs (see examples).
+5. Infer a short, descriptive workout title (e.g. "Upper Body Pull & Push", "Leg Day & Intervals", "Full Body Circuit").
 
 ### FEW-SHOT EXAMPLES:
 
@@ -44,28 +45,45 @@ Parsed:
 {
   "name": "Dumbbell Chest Press",
   "details": "3 sets: 10kg × 6, 7.5kg × 12, 7.5kg × 10 reps",
-  "isCustom": false
+  "isCustom": false,
+  "primaryMuscles": ["Chest"],
+  "secondaryMuscles": ["Triceps", "Shoulders"]
 }
 
-Example 2 (Bodyweight with Varying Reps - Catalog match):
+Example 2 (Bodyweight Squats - Leg movement):
+Input: "Bodyweight squats 15reps * 3"
+Parsed:
+{
+  "name": "Bodyweight Squats",
+  "details": "3 sets × 15 reps",
+  "isCustom": false,
+  "primaryMuscles": ["Quads", "Glutes"],
+  "secondaryMuscles": ["Hamstrings", "Calves", "Core"]
+}
+
+Example 3 (Bodyweight with Varying Reps - Catalog match):
 Input: "Scapula pullups 15reps, 10reps"
 Parsed:
 {
   "name": "Scapula Pull-ups",
   "details": "2 sets: 15 reps, 10 reps",
-  "isCustom": false
+  "isCustom": false,
+  "primaryMuscles": ["Scapula"],
+  "secondaryMuscles": ["Lats", "Upper Back", "Forearms"]
 }
 
-Example 3 (Uniform Sets × Reps - Catalog match):
+Example 4 (Uniform Sets × Reps - Catalog match):
 Input: "Scapula pushups 15reps * 2"
 Parsed:
 {
   "name": "Scapula Push-ups",
   "details": "2 sets × 15 reps",
-  "isCustom": false
+  "isCustom": false,
+  "primaryMuscles": ["Scapula"],
+  "secondaryMuscles": ["Triceps", "Shoulders", "Core"]
 }
 
-Example 4 (Custom Unilateral / Stability Ball - 1-2 Primary & Secondary):
+Example 5 (Custom Unilateral / Stability Ball - 1-2 Primary & Secondary):
 Input: "Kettlebell Stability Ball Single-Arm Chest Press -> 4kg * 6 reps"
 Parsed:
 {
@@ -76,7 +94,7 @@ Parsed:
   "secondaryMuscles": ["Triceps", "Shoulders"]
 }
 
-Example 5 (Custom Isolation - Single Primary + 1 Secondary):
+Example 6 (Custom Isolation - Single Primary + 1 Secondary):
 Input: "Overhead Rope Cable Triceps Extension 15kg 3x12"
 Parsed:
 {
@@ -87,7 +105,7 @@ Parsed:
   "secondaryMuscles": ["Shoulders"]
 }
 
-Example 6 (Custom Pull - Single Primary + 2 Secondaries):
+Example 7 (Custom Pull - Single Primary + 2 Secondaries):
 Input: "Single Arm Kneeling Cable Lat Pulldown 12kg * 12, 12kg * 10"
 Parsed:
 {
@@ -98,13 +116,15 @@ Parsed:
   "secondaryMuscles": ["Biceps", "Upper Back"]
 }
 
-Example 7 (Cardio Intervals):
+Example 8 (Cardio Intervals):
 Input: "Running: 5 sets 2 mins run @ 12km/h and 2 mins walk 3km/h flat"
 Parsed:
 {
   "name": "Running Intervals",
   "details": "5 sets: 2 mins run @ 12 km/h + 2 mins walk @ 3 km/h (0% incline)",
-  "isCustom": false
+  "isCustom": false,
+  "primaryMuscles": ["Quads", "Calves"],
+  "secondaryMuscles": ["Hamstrings", "Glutes", "Core"]
 }
 
 ### TITLE DETERMINATION GUIDELINES:
@@ -275,26 +295,50 @@ TASK:
       });
     }
 
-    // Enrich parsed items with our local database
+    // Enrich parsed items with our local database & canonical definitions
     const finalItems: WorkoutItem[] = parsedResult.items.map((item, idx) => {
+      let name = item.name;
       let primary = item.primaryMuscles || [];
       let secondary = item.secondaryMuscles || [];
       let muscleGroup = "full-body";
 
-      if (!item.isCustom) {
-        const match = findUnifiedExercise(item.name);
-        if (match) {
+      // 1. Look up in unified database (which checks canonical dictionary first)
+      const match = findUnifiedExercise(name);
+      if (match) {
+        name = match.name;
+        if (match.primaryMuscles && match.primaryMuscles.length > 0) {
           primary = match.primaryMuscles;
-          secondary = match.secondaryMuscles;
-          muscleGroup = match.category?.toLowerCase() || primary[0]?.toLowerCase() || "full-body";
         }
+        if (match.secondaryMuscles && match.secondaryMuscles.length > 0) {
+          secondary = match.secondaryMuscles;
+        }
+        muscleGroup = match.category?.toLowerCase() || primary[0]?.toLowerCase() || "full-body";
       } else {
         muscleGroup = primary[0]?.toLowerCase() || "full-body";
       }
 
+      // 2. Anatomical Sanity Guardrail:
+      // If the exercise name contains "squat" or "lunge", ensure it NEVER has Upper Back/Lats/Chest as primary!
+      if (/\bsquats?\b|\blunges?\b/i.test(name)) {
+        if (primary.some((m) => /back|chest|bicep|tricep/i.test(m))) {
+          primary = ["Quads", "Glutes"];
+          secondary = ["Hamstrings", "Calves"];
+          muscleGroup = "quads";
+        }
+      }
+
+      // If the exercise name contains "push-up" or "bench press", ensure it never has Hamstrings/Quads as primary
+      if (/\bpush-?ups?\b|\bbench\s+press\b|\bchest\s+press\b/i.test(name)) {
+        if (primary.some((m) => /quad|hamstring|calf/i.test(m))) {
+          primary = ["Chest"];
+          secondary = ["Triceps", "Shoulders"];
+          muscleGroup = "chest";
+        }
+      }
+
       return {
         id: `item-parsed-${Date.now()}-${idx}`,
-        name: item.name,
+        name,
         muscleGroup: muscleGroup as any,
         targetMuscles: primary,
         primaryMuscles: primary,
