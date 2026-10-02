@@ -123,6 +123,13 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
     // Merge: Append new items to the existing workout
     const targetWorkoutId = existing.id;
 
+    // Update parent title if updated title is provided
+    if (workout.title && workout.title.trim() && workout.title.trim() !== existing.title) {
+      await db.prepare(
+        "UPDATE workouts SET title = ? WHERE id = ?"
+      ).bind(workout.title.trim(), targetWorkoutId).run();
+    }
+
     // Get current max sort_order
     const maxSortRes = await db.prepare(
       "SELECT MAX(sort_order) as max_sort FROM workout_items WHERE workout_id = ?"

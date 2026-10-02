@@ -84,7 +84,11 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
       const res = await fetch("/api/parse-workout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: rawText }),
+        body: JSON.stringify({
+          text: rawText,
+          existingTitle: existingWorkoutForDate?.title,
+          existingExercises: existingWorkoutForDate?.items.map((i) => i.name) || [],
+        }),
       });
 
       if (!res.ok) {
@@ -93,7 +97,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
       }
 
       const data = await res.json();
-      setParsedTitle(data.title || "Workout Session");
+      setParsedTitle(data.title || existingWorkoutForDate?.title || "Workout Session");
       setParsedItems(data.items || []);
     } catch (err: any) {
       setParseError(err.message || "Failed to process workout notes");
@@ -116,9 +120,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     setIsSaving(true);
     setSaveError(null);
 
-    const titleToUse = existingWorkoutForDate
-      ? existingWorkoutForDate.title
-      : parsedTitle || "Workout Session";
+    const titleToUse = parsedTitle.trim() || existingWorkoutForDate?.title || "Workout Session";
 
     const newWorkoutPayload: WorkoutEntry = {
       id: existingWorkoutForDate?.id || `workout-${Date.now()}`,

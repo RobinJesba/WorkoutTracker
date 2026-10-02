@@ -107,6 +107,43 @@ Parsed:
   "isCustom": false
 }
 
+### TITLE DETERMINATION GUIDELINES:
+1. For a brand new workout: Infer a concise, professional title (e.g. "Upper Body Pull & Push", "Leg Day & Intervals", "Chest & Shoulders", "Full Body Circuit").
+2. If existing workout context for the date is provided:
+   - Review ALL exercises for the day (Existing Completed Exercises + New Exercises).
+   - If the existing title already accurately and adequately summarizes the entire session, KEEP the existing title unchanged.
+   - If the new exercises change, broaden, or shift the focus of the workout (e.g., adding cardio intervals to an upper body push; adding leg squats to chest; expanding into a full body session), return an updated, concise, professional title.
+
+### TITLE UPDATE FEW-SHOT EXAMPLES:
+
+Title Example 1 (Existing title is accurate -> Keep existing title):
+Existing Title: "Upper Body Pull & Push"
+Existing Exercises: Dumbbell Chest Press, Scapula Pull-ups, Cable Row
+New Exercises to Add: Incline Dumbbell Bench Press, Triceps Pushdown
+Combined Day Focus: Still Upper Body Pull & Push.
+Title: "Upper Body Pull & Push"
+
+Title Example 2 (Cardio added to strength -> Update title):
+Existing Title: "Chest & Shoulders"
+Existing Exercises: Dumbbell Chest Press, Shoulder Press, Incline Push-ups
+New Exercises to Add: Running: 5 sets 2 mins run @ 12km/h and 2 mins walk 3km/h
+Combined Day Focus: Chest & shoulders plus high-intensity treadmill running intervals.
+Title: "Chest, Shoulders & Running Intervals"
+
+Title Example 3 (Legs added to upper body -> Update title to full body):
+Existing Title: "Upper Body Push"
+Existing Exercises: Dumbbell Chest Press, Dips, Overhead Triceps Extension
+New Exercises to Add: Barbell Back Squat, Romanian Deadlift
+Combined Day Focus: Significant push strength combined with heavy lower body.
+Title: "Full Body Strength"
+
+Title Example 4 (Core finisher added to pull session -> Update title):
+Existing Title: "Back & Pull"
+Existing Exercises: Lat Pulldown, Seated Cable Row, Face Pulls
+New Exercises to Add: Hanging Leg Raises, Ab Wheel Rollouts, Plank
+Combined Day Focus: Back pull workout plus dedicated abdominal core finisher.
+Title: "Back Pull & Core"
+
 OUTPUT FORMAT:
 Return ONLY valid JSON (no markdown formatting, no backticks, no comments) with this structure:
 {
@@ -124,7 +161,7 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no comments) with 
 `;
 
 // Local deterministic fallback parser if AI is unavailable (e.g. offline local dev)
-function fallbackLocalParse(text: string) {
+function fallbackLocalParse(text: string, existingTitle?: string) {
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -153,7 +190,7 @@ function fallbackLocalParse(text: string) {
   });
 
   return {
-    title: "Logged Workout",
+    title: existingTitle || "Logged Workout",
     items,
   };
 }
@@ -162,12 +199,33 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const text = body?.text?.trim();
+    const existingTitle = typeof body?.existingTitle === "string" ? body.existingTitle.trim() : "";
+    const existingExercises = Array.isArray(body?.existingExercises)
+      ? body.existingExercises.filter((e: any) => typeof e === "string" && e.trim().length > 0)
+      : [];
 
     if (!text) {
       return NextResponse.json({ error: "Missing workout text" }, { status: 400 });
     }
 
     const ai = await getAI();
+
+    let userPrompt = text;
+    if (existingTitle || existingExercises.length > 0) {
+      userPrompt = `CONTEXT (EXISTING LOG FOR THIS DATE):
+Existing Title: "${existingTitle || 'Workout Session'}"
+Existing Completed Exercises for this date:
+${existingExercises.length > 0 ? existingExercises.map((e: string, i: number) => `${i + 1}. ${e}`).join("\n") : "None specified"}
+
+NEW WORKOUT NOTES TO ADD:
+${text}
+
+TASK:
+1. Parse the NEW WORKOUT NOTES into structured items.
+2. Determine the overall workout "title" for the entire day (considering existing exercises + new exercises):
+   - If the existing title "${existingTitle || 'Workout Session'}" is still accurate for the combined day, KEEP IT.
+   - If the new exercises change or expand the scope (e.g. adding cardio to upper body, adding legs, or changing muscle focus), provide an updated, concise, professional title.`;
+    }
 
     let rawJsonText = "";
 
@@ -176,7 +234,7 @@ export async function POST(req: Request) {
       const response = await ai.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: text },
+          { role: "user", content: userPrompt },
         ],
         max_tokens: 1500,
         temperature: 0.1,
@@ -209,7 +267,7 @@ export async function POST(req: Request) {
 
     // Fallback if AI not available or returned non-JSON
     if (!parsedResult || !parsedResult.items || parsedResult.items.length === 0) {
-      const fallback = fallbackLocalParse(text);
+      const fallback = fallbackLocalParse(text, existingTitle);
       return NextResponse.json({
         title: fallback.title,
         items: fallback.items,
