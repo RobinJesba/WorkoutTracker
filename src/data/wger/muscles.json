@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "name": "Biceps",
+    "latinName": "Biceps brachii",
+    "isFront": true
+  },
+  {
+    "id": 2,
+    "name": "Shoulders",
+    "latinName": "Anterior deltoid",
+    "isFront": true
+  },
+  {
+    "id": 3,
+    "name": "Serratus anterior",
+    "latinName": "Serratus anterior",
+    "isFront": true
+  },
+  {
+    "id": 4,
+    "name": "Chest",
+    "latinName": "Pectoralis major",
+    "isFront": true
+  },
+  {
+    "id": 5,
+    "name": "Triceps",
+    "latinName": "Triceps brachii",
+    "isFront": false
+  },
+  {
+    "id": 6,
+    "name": "Abs",
+    "latinName": "Rectus abdominis",
+    "isFront": true
+  },
+  {
+    "id": 7,
+    "name": "Calves",
+    "latinName": "Gastrocnemius",
+    "isFront": false
+  },
+  {
+    "id": 8,
+    "name": "Glutes",
+    "latinName": "Gluteus maximus",
+    "isFront": false
+  },
+  {
+    "id": 9,
+    "name": "Trapezius",
+    "latinName": "Trapezius",
+    "isFront": false
+  },
+  {
+    "id": 10,
+    "name": "Quads",
+    "latinName": "Quadriceps femoris",
+    "isFront": true
+  },
+  {
+    "id": 11,
+    "name": "Hamstrings",
+    "latinName": "Biceps femoris",
+    "isFront": false
+  },
+  {
+    "id": 12,
+    "name": "Lats",
+    "latinName": "Latissimus dorsi",
+    "isFront": false
+  },
+  {
+    "id": 13,
+    "name": "Brachialis",
+    "latinName": "Brachialis",
+    "isFront": true
+  },
+  {
+    "id": 14,
+    "name": "Obliquus externus abdominis",
+    "latinName": "Obliquus externus abdominis",
+    "isFront": true
+  },
+  {
+    "id": 15,
+    "name": "Soleus",
+    "latinName": "Soleus",
+    "isFront": false
+  },
+  {
+    "id": 16,
+    "name": "Lower back",
+    "latinName": "Erector spinae",
+    "isFront": false
+  }
+]

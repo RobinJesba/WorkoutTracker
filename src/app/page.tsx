@@ -5,7 +5,7 @@ import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
 import { MuscleIcon } from "@/components/MuscleIcon";
 import { WorkoutEntry } from "@/types/workout";
 
-const CACHE_KEY = "robin_workouts_v1";
+const CACHE_KEY = "robin_workouts_v3";
 
 export default function WorkoutListPage() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>(INITIAL_WORKOUTS);
@@ -108,13 +108,15 @@ export default function WorkoutListPage() {
                   >
                     {/* Anatomical Target Muscle Silhouette Icon */}
                     <div 
-                      className="p-1 sm:p-1.5 rounded-md bg-zinc-900 border border-zinc-800/80 flex items-center justify-center shrink-0"
-                      title={`Targeted muscles: ${item.targetMuscles?.join(", ") || item.muscleGroup}`}
+                      className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800/90 flex flex-col items-center justify-center shrink-0 w-[68px] min-w-[68px]"
+                      title={`Targeted muscles: ${(item.primaryMuscles || item.targetMuscles)?.join(", ")}${item.secondaryMuscles?.length ? ` (Secondary: ${item.secondaryMuscles.join(", ")})` : ""}`}
                     >
                       <MuscleIcon 
                         targetMuscles={item.targetMuscles} 
+                        primaryMuscles={item.primaryMuscles}
+                        secondaryMuscles={item.secondaryMuscles}
                         muscleGroup={item.muscleGroup} 
-                        size={26} 
+                        size={24} 
                       />
                     </div>
 
@@ -125,12 +127,22 @@ export default function WorkoutListPage() {
                           {item.name}
                         </span>
                         <div className="flex flex-wrap items-center gap-1">
-                          {item.targetMuscles?.map((muscle) => (
+                          {(item.primaryMuscles || item.targetMuscles)?.map((muscle) => (
                             <span
                               key={muscle}
                               className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide bg-zinc-800/90 text-emerald-400 border border-emerald-400/20"
+                              title="Primary target muscle"
                             >
                               {muscle}
+                            </span>
+                          ))}
+                          {item.secondaryMuscles?.map((muscle) => (
+                            <span
+                              key={muscle}
+                              className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-wide bg-zinc-900/90 text-zinc-400 border border-zinc-700/60"
+                              title="Secondary synergist muscle"
+                            >
+                              + {muscle}
                             </span>
                           ))}
                         </div>

@@ -4,7 +4,9 @@ export interface WorkoutItem {
   id: string;
   name: string;
   muscleGroup: MuscleGroup;
-  targetMuscles: string[]; // e.g. ["Quadriceps", "Glutes"]
+  targetMuscles: string[]; // e.g. ["Quads", "Glutes"]
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
   details: string;
 }
 

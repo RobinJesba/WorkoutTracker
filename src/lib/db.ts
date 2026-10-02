@@ -1,5 +1,6 @@
 import { WorkoutEntry, WorkoutItem } from "@/types/workout";
 import { INITIAL_WORKOUTS } from "@/data/workouts";
+import { findUnifiedExercise } from "@/lib/exerciseDatabase";
 
 interface CloudflareEnv {
   DB?: {
@@ -61,16 +62,36 @@ export async function getWorkouts(): Promise<WorkoutEntry[]> {
             .filter((item) => item.workout_id === w.id)
             .map((item) => {
               let targetMuscles: string[] = [];
+              let primaryMuscles: string[] | undefined = undefined;
+              let secondaryMuscles: string[] | undefined = undefined;
               try {
-                targetMuscles = JSON.parse(item.target_muscles || "[]");
+                const parsed = JSON.parse(item.target_muscles || "[]");
+                if (Array.isArray(parsed)) {
+                  targetMuscles = parsed;
+                } else if (parsed && typeof parsed === "object") {
+                  primaryMuscles = parsed.primary;
+                  secondaryMuscles = parsed.secondary;
+                  targetMuscles = parsed.primary || [];
+                }
               } catch {
                 targetMuscles = [item.target_muscles];
               }
+
+              if (!primaryMuscles && item.name) {
+                const match = findUnifiedExercise(item.name);
+                if (match) {
+                  primaryMuscles = match.primaryMuscles;
+                  secondaryMuscles = match.secondaryMuscles;
+                }
+              }
+
               return {
                 id: item.id,
                 name: item.name,
                 muscleGroup: item.muscle_group,
                 targetMuscles,
+                primaryMuscles,
+                secondaryMuscles,
                 details: item.details,
               };
             }),
