@@ -3,33 +3,13 @@
 import React, { useState, useRef } from "react";
 import { MuscleIcon } from "./MuscleIcon";
 import { WorkoutEntry, WorkoutItem } from "@/types/workout";
+import { formatWorkoutDate, getTodayIso, isSameWorkoutDay } from "@/lib/date";
 
 interface QuickLogModalProps {
   isOpen: boolean;
   onClose: () => void;
   onWorkoutSaved: (workout: WorkoutEntry, isMerged?: boolean) => void;
   existingWorkouts?: WorkoutEntry[];
-}
-
-function getTodayIso(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatIsoToDisplay(isoStr: string): string {
-  if (!isoStr) return "";
-  const parts = isoStr.split("-").map(Number);
-  if (parts.length !== 3) return isoStr;
-  const [year, month, day] = parts;
-  const d = new Date(year, month - 1, day);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 const NOTES_PLACEHOLDER = `Dumbbell chest press - 10kg * 6, 7.5kg * 12, 7.5 * 10
@@ -67,8 +47,8 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
 
   if (!isOpen) return null;
 
-  const displayDate = formatIsoToDisplay(selectedDateIso);
-  const existingWorkoutForDate = existingWorkouts.find((w) => w.date === displayDate);
+  const displayDate = formatWorkoutDate(selectedDateIso);
+  const existingWorkoutForDate = existingWorkouts.find((w) => isSameWorkoutDay(w.date, displayDate));
 
   const handleSubmit = async () => {
     if (!rawText.trim()) {

@@ -1,6 +1,7 @@
 import { WorkoutEntry, WorkoutItem } from "@/types/workout";
 import { INITIAL_WORKOUTS } from "@/data/workouts";
 import { findUnifiedExercise } from "@/lib/exerciseDatabase";
+import { formatWorkoutDate } from "@/lib/date";
 
 interface CloudflareEnv {
   DB?: {
@@ -56,7 +57,7 @@ export async function getWorkouts(): Promise<WorkoutEntry[]> {
       if (rawWorkouts.length > 0) {
         return rawWorkouts.map((w) => ({
           id: w.id,
-          date: w.date,
+          date: formatWorkoutDate(w.date),
           title: w.title,
           items: rawItems
             .filter((item) => item.workout_id === w.id)
@@ -112,10 +113,12 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
     throw new Error("Cloudflare D1 database is not connected.");
   }
 
+  const standardDate = formatWorkoutDate(workout.date);
+
   // 1. Check if a workout with this exact date already exists
   const existingRes = await db.prepare(
-    "SELECT id, date, title FROM workouts WHERE date = ? LIMIT 1"
-  ).bind(workout.date).all();
+    "SELECT id, date, title FROM workouts WHERE date = ? OR date = ? LIMIT 1"
+  ).bind(standardDate, workout.date).all();
 
   const existing = (existingRes.results?.[0] as { id: string; date: string; title: string }) || null;
 
@@ -168,7 +171,7 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
   // Insert parent workout
   await db.prepare(
     "INSERT INTO workouts (id, date, title) VALUES (?, ?, ?)"
-  ).bind(id, workout.date, workout.title).run();
+  ).bind(id, standardDate, workout.title).run();
 
   // Insert items
   if (workout.items && workout.items.length > 0) {

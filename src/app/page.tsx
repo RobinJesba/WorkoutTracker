@@ -5,11 +5,14 @@ import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
 import { MuscleIcon } from "@/components/MuscleIcon";
 import { QuickLogModal } from "@/components/QuickLogModal";
 import { WorkoutEntry } from "@/types/workout";
+import { formatWorkoutDate, isSameWorkoutDay } from "@/lib/date";
 
 const CACHE_KEY = "robin_workouts_v3";
 
 export default function WorkoutListPage() {
-  const [workouts, setWorkouts] = useState<WorkoutEntry[]>(INITIAL_WORKOUTS);
+  const [workouts, setWorkouts] = useState<WorkoutEntry[]>(() =>
+    INITIAL_WORKOUTS.map((w) => ({ ...w, date: formatWorkoutDate(w.date) }))
+  );
   const [isOffline, setIsOffline] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -23,7 +26,12 @@ export default function WorkoutListPage() {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setWorkouts(parsed);
+            setWorkouts(
+              parsed.map((w: WorkoutEntry) => ({
+                ...w,
+                date: formatWorkoutDate(w.date),
+              }))
+            );
           }
         }
       } catch (e) {
@@ -42,8 +50,12 @@ export default function WorkoutListPage() {
         .then((res) => res.json())
         .then((data) => {
           if (data?.workouts && Array.isArray(data.workouts) && data.workouts.length > 0) {
-            setWorkouts(data.workouts);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(data.workouts));
+            const formatted = data.workouts.map((w: WorkoutEntry) => ({
+              ...w,
+              date: formatWorkoutDate(w.date),
+            }));
+            setWorkouts(formatted);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(formatted));
           }
         })
         .catch(() => {
@@ -58,14 +70,21 @@ export default function WorkoutListPage() {
   }, []);
 
   const handleWorkoutSaved = (savedWorkout: WorkoutEntry, isMerged?: boolean) => {
+    const formattedWorkout: WorkoutEntry = {
+      ...savedWorkout,
+      date: formatWorkoutDate(savedWorkout.date),
+    };
+
     setWorkouts((prev) => {
-      const existingIndex = prev.findIndex((w) => w.date === savedWorkout.date);
+      const existingIndex = prev.findIndex((w) => isSameWorkoutDay(w.date, formattedWorkout.date));
       if (existingIndex >= 0) {
         const existing = prev[existingIndex];
         // Append newly added items to existing workout
         const mergedWorkout: WorkoutEntry = {
           ...existing,
-          items: [...existing.items, ...savedWorkout.items],
+          date: formatWorkoutDate(formattedWorkout.date),
+          title: formattedWorkout.title || existing.title,
+          items: [...existing.items, ...formattedWorkout.items],
         };
         const updated = [...prev];
         updated[existingIndex] = mergedWorkout;
@@ -74,7 +93,7 @@ export default function WorkoutListPage() {
         }
         return updated;
       } else {
-        const updated = [savedWorkout, ...prev];
+        const updated = [formattedWorkout, ...prev];
         if (typeof window !== "undefined") {
           localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
         }
@@ -141,7 +160,7 @@ export default function WorkoutListPage() {
                   {workout.title}
                 </h2>
                 <time className="text-xs font-mono text-zinc-400 shrink-0 ml-2">
-                  {workout.date}
+                  {formatWorkoutDate(workout.date)}
                 </time>
               </div>
 
