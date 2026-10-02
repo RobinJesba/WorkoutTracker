@@ -6,6 +6,24 @@ import { WorkoutEntry, WorkoutItem } from "@/types/workout";
 import { formatWorkoutDate, workoutDateToIso } from "@/lib/date";
 import { findUnifiedExercise } from "@/lib/exerciseDatabase";
 
+const APPROVED_MUSCLES = [
+  "Chest",
+  "Lats",
+  "Upper Back",
+  "Scapula",
+  "Lower Back",
+  "Shoulders",
+  "Biceps",
+  "Triceps",
+  "Forearms",
+  "Quads",
+  "Hamstrings",
+  "Glutes",
+  "Calves",
+  "Abs",
+  "Core",
+];
+
 interface EditWorkoutModalProps {
   workout: WorkoutEntry | null;
   isOpen: boolean;
@@ -13,6 +31,113 @@ interface EditWorkoutModalProps {
   onWorkoutUpdated: (updated: WorkoutEntry) => void;
   onWorkoutDeleted: (deletedId: string) => void;
 }
+
+interface MuscleTagSelectorProps {
+  type: "primary" | "secondary";
+  label: string;
+  muscles: string[];
+  onAdd: (muscle: string) => void;
+  onRemove: (muscle: string) => void;
+}
+
+const MuscleTagSelector: React.FC<MuscleTagSelectorProps> = ({
+  type,
+  label,
+  muscles,
+  onAdd,
+  onRemove,
+}) => {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = APPROVED_MUSCLES.filter(
+    (m) =>
+      !muscles.some((existing) => existing.toLowerCase() === m.toLowerCase()) &&
+      m.toLowerCase().includes(query.toLowerCase().trim())
+  );
+
+  const handleSelect = (muscle: string) => {
+    onAdd(muscle);
+    setQuery("");
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && filtered.length > 0) {
+      e.preventDefault();
+      handleSelect(filtered[0]);
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+      <span className="text-[10px] uppercase tracking-wider text-zinc-500 w-14 shrink-0 font-medium">
+        {label}:
+      </span>
+
+      {/* Selected Tags */}
+      {muscles.map((m) => (
+        <span
+          key={m}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide border ${
+            type === "primary"
+              ? "bg-zinc-800 text-emerald-400 border-emerald-400/20"
+              : "bg-zinc-900 text-zinc-400 border-zinc-700/60"
+          }`}
+        >
+          <span>{type === "secondary" ? `+ ${m}` : m}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(m)}
+            className="text-zinc-500 hover:text-red-400 font-bold ml-0.5 leading-none transition-colors cursor-pointer"
+            title={`Remove ${m}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+
+      {/* Autocomplete Input */}
+      <div className="relative inline-block" ref={containerRef}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+          onKeyDown={handleKeyDown}
+          placeholder={`+ ${label.toLowerCase()}...`}
+          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-0.5 text-[11px] font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 w-24 sm:w-28"
+        />
+
+        {isOpen && filtered.length > 0 && (
+          <div className="absolute left-0 top-full mt-1 w-36 max-h-40 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-40 py-1 text-xs font-mono">
+            {filtered.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(m);
+                }}
+                className="w-full text-left px-2.5 py-1 text-zinc-300 hover:text-emerald-400 hover:bg-zinc-800 transition-colors flex items-center justify-between cursor-pointer"
+              >
+                <span>{m}</span>
+                <span className="text-[10px] text-zinc-500 font-bold">+</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
   workout,
@@ -28,7 +153,20 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (workout && isOpen) {
@@ -59,7 +197,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
       const next = [...prev];
       const current = { ...next[index], name: newName };
 
-      // Attempt live muscle auto-match if recognizable name
+      // Attempt live muscle auto-match if recognizable name and muscles not explicitly set
       if (newName.trim().length >= 3) {
         const match = findUnifiedExercise(newName.trim());
         if (match) {
@@ -83,6 +221,54 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
     });
   };
 
+  const handleAddMuscle = (itemIdx: number, type: "primary" | "secondary", muscle: string) => {
+    setItems((prev) => {
+      const next = [...prev];
+      const item = { ...next[itemIdx] };
+
+      if (type === "primary") {
+        const primary = [...(item.primaryMuscles || item.targetMuscles || [])];
+        if (!primary.includes(muscle)) {
+          primary.push(muscle);
+        }
+        item.primaryMuscles = primary;
+        item.targetMuscles = primary;
+      } else {
+        const secondary = [...(item.secondaryMuscles || [])];
+        if (!secondary.includes(muscle)) {
+          secondary.push(muscle);
+        }
+        item.secondaryMuscles = secondary;
+      }
+
+      next[itemIdx] = item;
+      return next;
+    });
+  };
+
+  const handleRemoveMuscle = (itemIdx: number, type: "primary" | "secondary", muscle: string) => {
+    setItems((prev) => {
+      const next = [...prev];
+      const item = { ...next[itemIdx] };
+
+      if (type === "primary") {
+        const primary = (item.primaryMuscles || item.targetMuscles || []).filter(
+          (m) => m.toLowerCase() !== muscle.toLowerCase()
+        );
+        item.primaryMuscles = primary;
+        item.targetMuscles = primary;
+      } else {
+        const secondary = (item.secondaryMuscles || []).filter(
+          (m) => m.toLowerCase() !== muscle.toLowerCase()
+        );
+        item.secondaryMuscles = secondary;
+      }
+
+      next[itemIdx] = item;
+      return next;
+    });
+  };
+
   const handleRemoveItem = (indexToRemove: number) => {
     setItems((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
@@ -92,12 +278,22 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
       id: `item-manual-${Date.now()}-${items.length}`,
       name: "",
       muscleGroup: "full-body" as any,
-      targetMuscles: ["Full-body"],
-      primaryMuscles: ["Full-body"],
+      targetMuscles: [],
+      primaryMuscles: [],
       secondaryMuscles: [],
       details: "",
     };
     setItems((prev) => [...prev, newItem]);
+
+    // Scroll to bottom smoothly so newly added item is in view
+    setTimeout(() => {
+      if (listContainerRef.current) {
+        listContainerRef.current.scrollTo({
+          top: listContainerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    }, 50);
   };
 
   const handleSave = async () => {
@@ -182,9 +378,9 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/80 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/80 backdrop-blur-sm overflow-hidden">
       <div
-        className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]"
+        className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col my-auto max-h-[88vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -195,7 +391,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
               </svg>
             </span>
-            <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">Manual Edit Workout</h2>
+            <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">Edit Workout</h2>
           </div>
           <button
             onClick={onClose}
@@ -208,87 +404,92 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-5 overflow-y-auto space-y-4 text-zinc-200">
-          {/* Title & Date Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Session Title Input */}
-            <div>
-              <label className="block text-xs font-mono text-zinc-400 mb-1.5">
-                Session Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Upper Body Pull & Push"
-                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium text-zinc-100 focus:outline-none focus:border-emerald-500/50"
-              />
-            </div>
-
-            {/* Workout Date Picker */}
-            <div>
-              <label className="block text-xs font-mono text-zinc-400 mb-1.5">
-                Workout Date
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={handleOpenDatePicker}
-                  className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-2 text-xs sm:text-sm font-mono text-zinc-100 hover:border-zinc-700 transition-colors text-left cursor-pointer active:bg-zinc-900"
-                >
-                  <span className="truncate">{displayDate}</span>
-                  <svg className="w-4 h-4 text-emerald-400/80 shrink-0 ml-1.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                  </svg>
-                </button>
+        {/* Modal Body: Fixed Controls + Scrollable Exercise List */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden text-zinc-200">
+          {/* Title & Date Controls (Fixed, non-scrolling) */}
+          <div className="p-5 pb-3 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Session Title Input */}
+              <div>
+                <label className="block text-xs font-mono text-zinc-400 mb-1.5">
+                  Session Title
+                </label>
                 <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={dateIso}
-                  onChange={(e) => {
-                    if (e.target.value) setDateIso(e.target.value);
-                  }}
-                  className="absolute inset-0 opacity-0 pointer-events-none w-full h-full [color-scheme:dark]"
-                  tabIndex={-1}
-                  aria-hidden="true"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Upper Body Pull & Push"
+                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium text-zinc-100 focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
+
+              {/* Workout Date Picker */}
+              <div>
+                <label className="block text-xs font-mono text-zinc-400 mb-1.5">
+                  Workout Date
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={handleOpenDatePicker}
+                    className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-2 text-xs sm:text-sm font-mono text-zinc-100 hover:border-zinc-700 transition-colors text-left cursor-pointer active:bg-zinc-900"
+                  >
+                    <span className="truncate">{displayDate}</span>
+                    <svg className="w-4 h-4 text-emerald-400/80 shrink-0 ml-1.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                  </button>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={dateIso}
+                    onChange={(e) => {
+                      if (e.target.value) setDateIso(e.target.value);
+                    }}
+                    className="absolute inset-0 opacity-0 pointer-events-none w-full h-full [color-scheme:dark]"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Exercises List Header */}
+            <div className="flex items-center justify-between pt-3 mt-3 border-t border-zinc-800/60">
+              <span className="text-xs font-mono text-zinc-400">
+                Exercises ({items.length})
+              </span>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="flex items-center gap-1 text-xs font-mono text-emerald-400 hover:text-emerald-300 px-2 py-1 rounded hover:bg-emerald-500/10 transition-colors cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                <span>Add Exercise</span>
+              </button>
             </div>
           </div>
 
-          {/* Exercises List Header */}
-          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60">
-            <span className="text-xs font-mono text-zinc-400">
-              Exercises ({items.length})
-            </span>
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="flex items-center gap-1 text-xs font-mono text-emerald-400 hover:text-emerald-300 px-2 py-1 rounded hover:bg-emerald-500/10 transition-colors cursor-pointer"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              <span>Add Exercise</span>
-            </button>
-          </div>
-
-          {/* Exercise Items List */}
-          <div className="space-y-3 max-h-[46vh] overflow-y-auto pr-1">
+          {/* Exercise Items List (Only this section scrolls!) */}
+          <div
+            ref={listContainerRef}
+            className="flex-1 overflow-y-auto px-5 pb-4 space-y-3"
+          >
             {items.map((item, idx) => (
               <div
                 key={item.id || idx}
-                className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 hover:border-zinc-700/60 transition-colors flex items-start gap-3"
+                className="p-3.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 hover:border-zinc-700/60 transition-colors flex items-center gap-3.5"
               >
-                {/* Silhouette Icon */}
-                <div className="p-1 rounded-lg bg-zinc-900 border border-zinc-800/90 flex flex-col items-center justify-center shrink-0 w-[58px] min-w-[58px] mt-1">
+                {/* Silhouette Icon: Perfectly Centered */}
+                <div className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800/90 flex flex-col items-center justify-center shrink-0 w-[68px] min-w-[68px] self-center">
                   <MuscleIcon
                     targetMuscles={item.targetMuscles}
                     primaryMuscles={item.primaryMuscles}
                     secondaryMuscles={item.secondaryMuscles}
                     muscleGroup={item.muscleGroup}
-                    size={22}
+                    size={24}
                   />
                 </div>
 
@@ -305,7 +506,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(idx)}
-                      className="text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-zinc-850 transition-colors shrink-0"
+                      className="text-zinc-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-zinc-850 transition-colors shrink-0 cursor-pointer"
                       title="Delete exercise"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
@@ -314,34 +515,32 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                     </button>
                   </div>
 
-                  {/* Muscle Tags Preview */}
-                  <div className="flex flex-wrap items-center gap-1">
-                    {(item.primaryMuscles || item.targetMuscles)?.map((m) => (
-                      <span
-                        key={m}
-                        className="px-1.5 py-0.2 rounded text-[9.5px] font-mono uppercase bg-zinc-850 text-emerald-400 border border-emerald-400/20"
-                      >
-                        {m}
-                      </span>
-                    ))}
-                    {item.secondaryMuscles?.map((m) => (
-                      <span
-                        key={m}
-                        className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-zinc-900 text-zinc-400 border border-zinc-700/60"
-                      >
-                        + {m}
-                      </span>
-                    ))}
-                  </div>
-
                   {/* Details Input */}
                   <input
                     type="text"
                     value={item.details}
                     onChange={(e) => handleItemDetailsChange(idx, e.target.value)}
-                    placeholder="Details: 3 sets × 10 reps @ 20kg"
+                    placeholder="Details: 3 sets: 10kg × 12, 10kg × 10 reps"
                     className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-zinc-300 focus:outline-none focus:border-emerald-500/50"
                   />
+
+                  {/* Muscle Tag Autocomplete Selectors */}
+                  <div className="space-y-1.5 pt-1.5 border-t border-zinc-900">
+                    <MuscleTagSelector
+                      type="primary"
+                      label="Primary"
+                      muscles={item.primaryMuscles || item.targetMuscles || []}
+                      onAdd={(m) => handleAddMuscle(idx, "primary", m)}
+                      onRemove={(m) => handleRemoveMuscle(idx, "primary", m)}
+                    />
+                    <MuscleTagSelector
+                      type="secondary"
+                      label="Secondary"
+                      muscles={item.secondaryMuscles || []}
+                      onAdd={(m) => handleAddMuscle(idx, "secondary", m)}
+                      onRemove={(m) => handleRemoveMuscle(idx, "secondary", m)}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -349,8 +548,10 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
-              {error}
+            <div className="px-5 pb-3">
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+                {error}
+              </div>
             </div>
           )}
         </div>
@@ -372,7 +573,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-2 py-1 text-xs font-mono text-zinc-400 hover:text-zinc-200"
+                  className="px-2 py-1 text-xs font-mono text-zinc-400 hover:text-zinc-200 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -393,7 +594,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSaving || isDeleting}
-              className="text-xs font-mono text-zinc-400 hover:text-zinc-200 px-3 py-2 rounded-lg hover:bg-zinc-800/40 transition-colors"
+              className="text-xs font-mono text-zinc-400 hover:text-zinc-200 px-3 py-2 rounded-lg hover:bg-zinc-800/40 transition-colors cursor-pointer"
             >
               Cancel
             </button>
