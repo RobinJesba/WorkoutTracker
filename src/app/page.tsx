@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ATHLETE_NAME } from "@/data/workouts";
 import { MuscleIcon } from "@/components/MuscleIcon";
 import { QuickLogModal } from "@/components/QuickLogModal";
+import { EditWorkoutModal } from "@/components/EditWorkoutModal";
 import { WorkoutEntry } from "@/types/workout";
 import { formatWorkoutDate, isSameWorkoutDay } from "@/lib/date";
 
@@ -11,6 +12,7 @@ export default function WorkoutListPage() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutEntry | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadWorkouts = async () => {
@@ -34,18 +36,9 @@ export default function WorkoutListPage() {
     }
   };
 
-  // Direct Cloudflare D1 fetch on mount & purge legacy localStorage keys
+  // Direct Cloudflare D1 fetch on mount
   useEffect(() => {
     loadWorkouts();
-
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("robin_workouts_v3");
-        localStorage.removeItem("workout_tracker_workouts_cache_v1");
-      } catch {
-        // ignore
-      }
-    }
   }, []);
 
   const handleWorkoutSaved = (savedWorkout: WorkoutEntry, isMerged?: boolean) => {
@@ -78,6 +71,22 @@ export default function WorkoutListPage() {
     setTimeout(() => setToastMessage(null), 3500);
 
     // Refresh from D1 in background for complete server parity
+    loadWorkouts();
+  };
+
+  const handleWorkoutUpdated = (updatedWorkout: WorkoutEntry) => {
+    setWorkouts((prev) =>
+      prev.map((w) => (w.id === updatedWorkout.id ? updatedWorkout : w))
+    );
+    setToastMessage("Workout updated in D1");
+    setTimeout(() => setToastMessage(null), 3500);
+    loadWorkouts();
+  };
+
+  const handleWorkoutDeleted = (deletedId: string) => {
+    setWorkouts((prev) => prev.filter((w) => w.id !== deletedId));
+    setToastMessage("Workout deleted from D1");
+    setTimeout(() => setToastMessage(null), 3500);
     loadWorkouts();
   };
 
@@ -158,14 +167,26 @@ export default function WorkoutListPage() {
                 key={workout.id}
                 className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 sm:p-5 hover:border-zinc-700/80 transition-colors shadow-sm"
               >
-                {/* Date & Title */}
-                <div className="flex items-baseline justify-between border-b border-zinc-800/60 pb-3 mb-3.5">
-                  <h2 className="text-sm sm:text-base font-semibold text-zinc-100 tracking-tight">
-                    {workout.title}
-                  </h2>
-                  <time className="text-xs font-mono text-zinc-400 shrink-0 ml-2">
-                    {formatWorkoutDate(workout.date)}
-                  </time>
+                {/* Date, Title & Actions */}
+                <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3 mb-3.5 gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm sm:text-base font-semibold text-zinc-100 tracking-tight">
+                      {workout.title}
+                    </h2>
+                    <time className="text-xs font-mono text-zinc-400 block mt-0.5">
+                      {formatWorkoutDate(workout.date)}
+                    </time>
+                  </div>
+                  <button
+                    onClick={() => setEditingWorkout(workout)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono text-zinc-400 hover:text-emerald-400 bg-zinc-950/60 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-emerald-500/30 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+                    title="Manual edit workout"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                    </svg>
+                    <span>Edit</span>
+                  </button>
                 </div>
 
                 {/* Items List */}
@@ -255,6 +276,15 @@ export default function WorkoutListPage() {
         onClose={() => setIsModalOpen(false)}
         onWorkoutSaved={handleWorkoutSaved}
         existingWorkouts={workouts}
+      />
+
+      {/* Manual Edit Workout Modal */}
+      <EditWorkoutModal
+        workout={editingWorkout}
+        isOpen={Boolean(editingWorkout)}
+        onClose={() => setEditingWorkout(null)}
+        onWorkoutUpdated={handleWorkoutUpdated}
+        onWorkoutDeleted={handleWorkoutDeleted}
       />
     </div>
   );

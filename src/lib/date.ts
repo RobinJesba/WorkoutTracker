@@ -54,6 +54,20 @@ export function getTodayIso(): string {
   return `${year}-${month}-${day}`;
 }
 
+export function workoutDateToIso(str: string | undefined | null): string {
+  if (!str) return getTodayIso();
+  const isoMatch = str.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) return str.trim();
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return getTodayIso();
+}
+
 export function isSameWorkoutDay(dateA: string | undefined | null, dateB: string | undefined | null): boolean {
   if (!dateA || !dateB) return false;
   const normA = formatWorkoutDate(dateA);
