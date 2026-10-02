@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { MuscleIcon } from "./MuscleIcon";
 import { WorkoutEntry, WorkoutItem } from "@/types/workout";
 
@@ -49,10 +49,21 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Parsed Preview State
   const [parsedTitle, setParsedTitle] = useState<string>("");
   const [parsedItems, setParsedItems] = useState<WorkoutItem[] | null>(null);
+
+  const handleOpenDatePicker = () => {
+    if (dateInputRef.current) {
+      if (typeof dateInputRef.current.showPicker === "function") {
+        dateInputRef.current.showPicker();
+      } else {
+        dateInputRef.current.focus();
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -186,34 +197,34 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <label className="block text-xs font-mono text-zinc-400 mb-1.5">
               Workout Date
             </label>
-            <div className="relative group">
-              {/* Visually displays the exact "Oct 3, 2026" format */}
-              <div className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 group-hover:border-zinc-700 transition-colors">
+            <div className="relative">
+              {/* Entire button is clickable and triggers native date picker */}
+              <button
+                type="button"
+                onClick={handleOpenDatePicker}
+                className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 hover:border-zinc-700 transition-colors text-left cursor-pointer active:bg-zinc-900"
+              >
                 <span className="font-mono text-zinc-100 font-medium tracking-tight">
                   {displayDate}
                 </span>
                 <svg className="w-4 h-4 text-emerald-400/80" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
-              </div>
+              </button>
 
-              {/* Invisible native date picker over the entire box to trigger calendar */}
+              {/* Native date input, triggered programmatically by showPicker() */}
               <input
+                ref={dateInputRef}
                 type="date"
                 value={selectedDateIso}
                 onChange={(e) => {
                   if (e.target.value) setSelectedDateIso(e.target.value);
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full [color-scheme:dark]"
-                title="Select date"
+                className="absolute inset-0 opacity-0 pointer-events-none w-full h-full [color-scheme:dark]"
+                tabIndex={-1}
+                aria-hidden="true"
               />
             </div>
-            {existingWorkoutForDate && (
-              <p className="mt-1.5 text-[11px] font-mono text-emerald-400/90 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                Existing workout found for {displayDate} ({existingWorkoutForDate.items.length} exercises) — new exercises will be appended.
-              </p>
-            )}
           </div>
 
           {/* Raw Workout Notes Input */}
@@ -252,16 +263,8 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
                     <span className="text-xs font-mono text-zinc-400">{displayDate}</span>
                     <span className="text-zinc-600">•</span>
                     <span className="text-[11px] font-mono text-emerald-400/90">
-                      +{parsedItems.length} new {parsedItems.length === 1 ? "exercise" : "exercises"}
+                      {parsedItems.length} {parsedItems.length === 1 ? "exercise" : "exercises"}
                     </span>
-                    {existingWorkoutForDate && (
-                      <>
-                        <span className="text-zinc-600">•</span>
-                        <span className="text-[11px] font-mono text-zinc-400">
-                          (Appends to {existingWorkoutForDate.items.length} existing)
-                        </span>
-                      </>
-                    )}
                   </div>
                 </div>
                 <button
@@ -396,7 +399,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
-                  <span>{existingWorkoutForDate ? "Merge into Log" : "Save to Log"}</span>
+                  <span>Save to Log</span>
                 </>
               )}
             </button>
