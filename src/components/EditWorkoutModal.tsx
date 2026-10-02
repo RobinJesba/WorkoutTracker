@@ -36,6 +36,7 @@ interface MuscleTagSelectorProps {
   type: "primary" | "secondary";
   label: string;
   muscles: string[];
+  excludedMuscles?: string[];
   onAdd: (muscle: string) => void;
   onRemove: (muscle: string) => void;
 }
@@ -44,16 +45,58 @@ const MuscleTagSelector: React.FC<MuscleTagSelectorProps> = ({
   type,
   label,
   muscles,
+  excludedMuscles = [],
   onAdd,
   onRemove,
 }) => {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const checkDropdownPosition = () => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const scrollParent =
+        containerRef.current.closest("[data-scroll-container]") ||
+        containerRef.current.closest(".overflow-y-auto");
+
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const spaceBelow = parentRect.bottom - rect.bottom;
+        const spaceAbove = rect.top - parentRect.top;
+        // If remaining space below is less than 170px and more space above, open upward
+        setOpenUpward(spaceBelow < 170 && spaceAbove > spaceBelow);
+      } else {
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setOpenUpward(spaceBelow < 170);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    checkDropdownPosition();
+
+    const handleScrollOrResize = () => {
+      checkDropdownPosition();
+    };
+
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, [isOpen]);
+
+  // Exclude muscles already in this selector AND muscles selected in the other selector
+  const allExcluded = [...muscles, ...excludedMuscles];
   const filtered = APPROVED_MUSCLES.filter(
     (m) =>
-      !muscles.some((existing) => existing.toLowerCase() === m.toLowerCase()) &&
+      !allExcluded.some((existing) => existing.toLowerCase() === m.toLowerCase()) &&
       m.toLowerCase().includes(query.toLowerCase().trim())
   );
 
@@ -101,15 +144,22 @@ const MuscleTagSelector: React.FC<MuscleTagSelectorProps> = ({
       ))}
 
       {/* Autocomplete Input */}
-      <div className="relative inline-block" ref={containerRef}>
+      <div className={`relative inline-block ${isOpen ? "z-30" : ""}`} ref={containerRef}>
         <input
           type="text"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
+            checkDropdownPosition();
             setIsOpen(true);
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            checkDropdownPosition();
+            setIsOpen(true);
+          }}
+          onClick={() => {
+            checkDropdownPosition();
+          }}
           onBlur={() => setTimeout(() => setIsOpen(false), 200)}
           onKeyDown={handleKeyDown}
           placeholder={`+ ${label.toLowerCase()}...`}
@@ -117,7 +167,11 @@ const MuscleTagSelector: React.FC<MuscleTagSelectorProps> = ({
         />
 
         {isOpen && filtered.length > 0 && (
-          <div className="absolute left-0 top-full mt-1 w-36 max-h-40 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-40 py-1 text-xs font-mono">
+          <div
+            className={`absolute left-0 w-36 max-h-40 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 py-1 text-xs font-mono ${
+              openUpward ? "bottom-full mb-1" : "top-full mt-1"
+            }`}
+          >
             {filtered.map((m) => (
               <button
                 key={m}
@@ -182,15 +236,6 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
 
   const displayDate = formatWorkoutDate(dateIso);
 
-  const handleOpenDatePicker = () => {
-    if (dateInputRef.current) {
-      if (typeof dateInputRef.current.showPicker === "function") {
-        dateInputRef.current.showPicker();
-      } else {
-        dateInputRef.current.focus();
-      }
-    }
-  };
 
   const handleItemNameChange = (index: number, newName: string) => {
     setItems((prev) => {
@@ -233,12 +278,24 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
         }
         item.primaryMuscles = primary;
         item.targetMuscles = primary;
+        // Mutual exclusion: Remove from secondary if present
+        if (item.secondaryMuscles) {
+          item.secondaryMuscles = item.secondaryMuscles.filter(
+            (m) => m.toLowerCase() !== muscle.toLowerCase()
+          );
+        }
       } else {
         const secondary = [...(item.secondaryMuscles || [])];
         if (!secondary.includes(muscle)) {
           secondary.push(muscle);
         }
         item.secondaryMuscles = secondary;
+        // Mutual exclusion: Remove from primary if present
+        const primary = (item.primaryMuscles || item.targetMuscles || []).filter(
+          (m) => m.toLowerCase() !== muscle.toLowerCase()
+        );
+        item.primaryMuscles = primary;
+        item.targetMuscles = primary;
       }
 
       next[itemIdx] = item;
@@ -273,28 +330,6 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
     setItems((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handleAddItem = () => {
-    const newItem: WorkoutItem = {
-      id: `item-manual-${Date.now()}-${items.length}`,
-      name: "",
-      muscleGroup: "full-body" as any,
-      targetMuscles: [],
-      primaryMuscles: [],
-      secondaryMuscles: [],
-      details: "",
-    };
-    setItems((prev) => [...prev, newItem]);
-
-    // Scroll to bottom smoothly so newly added item is in view
-    setTimeout(() => {
-      if (listContainerRef.current) {
-        listContainerRef.current.scrollTo({
-          top: listContainerRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      }
-    }, 50);
-  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -428,17 +463,24 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                 <label className="block text-xs font-mono text-zinc-400 mb-1.5">
                   Workout Date
                 </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={handleOpenDatePicker}
-                    className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-2 text-xs sm:text-sm font-mono text-zinc-100 hover:border-zinc-700 transition-colors text-left cursor-pointer active:bg-zinc-900"
+                <div
+                  className="relative cursor-pointer"
+                  onClick={() => {
+                    if (dateInputRef.current && typeof dateInputRef.current.showPicker === "function") {
+                      try {
+                        dateInputRef.current.showPicker();
+                      } catch {}
+                    }
+                  }}
+                >
+                  <div
+                    className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-2 text-xs sm:text-sm font-mono text-zinc-100 hover:border-zinc-700 transition-colors text-left"
                   >
                     <span className="truncate">{displayDate}</span>
                     <svg className="w-4 h-4 text-emerald-400/80 shrink-0 ml-1.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
-                  </button>
+                  </div>
                   <input
                     ref={dateInputRef}
                     type="date"
@@ -446,35 +488,32 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                     onChange={(e) => {
                       if (e.target.value) setDateIso(e.target.value);
                     }}
-                    className="absolute inset-0 opacity-0 pointer-events-none w-full h-full [color-scheme:dark]"
-                    tabIndex={-1}
-                    aria-hidden="true"
+                    onClick={(e) => {
+                      if (typeof (e.currentTarget as any).showPicker === "function") {
+                        try {
+                          (e.currentTarget as any).showPicker();
+                        } catch {}
+                      }
+                    }}
+                    className="native-date-overlay text-base [color-scheme:dark]"
+                    aria-label="Workout Date"
                   />
                 </div>
               </div>
             </div>
 
             {/* Exercises List Header */}
-            <div className="flex items-center justify-between pt-3 mt-3 border-t border-zinc-800/60">
+            <div className="pt-3 mt-3 border-t border-zinc-800/60">
               <span className="text-xs font-mono text-zinc-400">
                 Exercises ({items.length})
               </span>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="flex items-center gap-1 text-xs font-mono text-emerald-400 hover:text-emerald-300 px-2 py-1 rounded hover:bg-emerald-500/10 transition-colors cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                <span>Add Exercise</span>
-              </button>
             </div>
           </div>
 
           {/* Exercise Items List (Only this section scrolls!) */}
           <div
             ref={listContainerRef}
+            data-scroll-container="true"
             className="flex-1 overflow-y-auto px-5 pb-4 space-y-3"
           >
             {items.map((item, idx) => (
@@ -530,6 +569,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                       type="primary"
                       label="Primary"
                       muscles={item.primaryMuscles || item.targetMuscles || []}
+                      excludedMuscles={item.secondaryMuscles || []}
                       onAdd={(m) => handleAddMuscle(idx, "primary", m)}
                       onRemove={(m) => handleRemoveMuscle(idx, "primary", m)}
                     />
@@ -537,6 +577,7 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
                       type="secondary"
                       label="Secondary"
                       muscles={item.secondaryMuscles || []}
+                      excludedMuscles={item.primaryMuscles || item.targetMuscles || []}
                       onAdd={(m) => handleAddMuscle(idx, "secondary", m)}
                       onRemove={(m) => handleRemoveMuscle(idx, "secondary", m)}
                     />

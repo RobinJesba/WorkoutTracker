@@ -46,15 +46,6 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleOpenDatePicker = () => {
-    if (dateInputRef.current) {
-      if (typeof dateInputRef.current.showPicker === "function") {
-        dateInputRef.current.showPicker();
-      } else {
-        dateInputRef.current.focus();
-      }
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -190,14 +181,20 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <label className="block text-xs font-mono text-zinc-400 mb-1.5">
               Workout Date
             </label>
-            <div className="relative">
-              {/* Entire button is clickable and triggers native date picker */}
-              <button
-                type="button"
-                onClick={parsedItems ? undefined : handleOpenDatePicker}
-                disabled={Boolean(parsedItems)}
+            <div
+              className={`relative ${parsedItems ? "cursor-not-allowed" : "cursor-pointer"}`}
+              onClick={() => {
+                if (!parsedItems && dateInputRef.current && typeof dateInputRef.current.showPicker === "function") {
+                  try {
+                    dateInputRef.current.showPicker();
+                  } catch {}
+                }
+              }}
+            >
+              {/* Visual presentation */}
+              <div
                 className={`w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 transition-colors text-left ${
-                  parsedItems ? "opacity-60 cursor-not-allowed" : "hover:border-zinc-700 cursor-pointer active:bg-zinc-900"
+                  parsedItems ? "opacity-60 cursor-not-allowed" : "hover:border-zinc-700"
                 }`}
               >
                 <span className="font-mono text-zinc-100 font-medium tracking-tight">
@@ -206,19 +203,28 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
                 <svg className="w-4 h-4 text-emerald-400/80" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
-              </button>
+              </div>
 
-              {/* Native date input, triggered programmatically by showPicker() */}
+              {/* Native date input, receives tap events directly */}
               <input
                 ref={dateInputRef}
                 type="date"
                 value={selectedDateIso}
+                disabled={Boolean(parsedItems)}
                 onChange={(e) => {
                   if (e.target.value) setSelectedDateIso(e.target.value);
                 }}
-                className="absolute inset-0 opacity-0 pointer-events-none w-full h-full [color-scheme:dark]"
-                tabIndex={-1}
-                aria-hidden="true"
+                onClick={(e) => {
+                  if (!parsedItems && typeof (e.currentTarget as any).showPicker === "function") {
+                    try {
+                      (e.currentTarget as any).showPicker();
+                    } catch {}
+                  }
+                }}
+                className={`native-date-overlay text-base [color-scheme:dark] ${
+                  parsedItems ? "cursor-not-allowed pointer-events-none" : ""
+                }`}
+                aria-label="Workout Date"
               />
             </div>
           </div>
