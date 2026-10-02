@@ -208,16 +208,83 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
   const dateInputRef = useRef<HTMLInputElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollSpeedRef = useRef<number>(0);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const lastPointerPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Lock body scroll when modal is open
+  const stopAutoScroll = () => {
+    autoScrollSpeedRef.current = 0;
+    if (autoScrollRafRef.current !== null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+  };
+
+  const startAutoScroll = () => {
+    if (autoScrollRafRef.current !== null) return;
+
+    const scrollLoop = () => {
+      if (listContainerRef.current && autoScrollSpeedRef.current !== 0) {
+        listContainerRef.current.scrollTop += autoScrollSpeedRef.current;
+
+        // Re-evaluate drop target card as container scrolls under stationary pointer
+        if (lastPointerPosRef.current) {
+          const { x, y } = lastPointerPosRef.current;
+          const rect = listContainerRef.current.getBoundingClientRect();
+          if (y <= rect.top + 10) {
+            setDragOverIdx(0);
+          } else if (y >= rect.bottom - 10) {
+            setDragOverIdx(items.length - 1);
+          } else {
+            const elem = document.elementFromPoint(x, y);
+            const card = elem?.closest("[data-item-index]");
+            if (card) {
+              const targetIdx = Number(card.getAttribute("data-item-index"));
+              if (!isNaN(targetIdx)) {
+                setDragOverIdx(targetIdx);
+              }
+            }
+          }
+        }
+      }
+      autoScrollRafRef.current = requestAnimationFrame(scrollLoop);
+    };
+
+    autoScrollRafRef.current = requestAnimationFrame(scrollLoop);
+  };
+
+  const updateAutoScrollSpeed = (clientY: number) => {
+    if (!listContainerRef.current) return;
+    const rect = listContainerRef.current.getBoundingClientRect();
+    const edgeZone = 75; // px trigger threshold from top/bottom
+    const maxSpeed = 14; // max scroll pixels per frame
+
+    if (clientY < rect.top + edgeZone) {
+      // Near or above top edge: scroll up
+      const factor = Math.min(1, Math.max(0.15, (rect.top + edgeZone - clientY) / edgeZone));
+      autoScrollSpeedRef.current = -Math.round(factor * maxSpeed);
+    } else if (clientY > rect.bottom - edgeZone) {
+      // Near or below bottom edge: scroll down
+      const factor = Math.min(1, Math.max(0.15, (clientY - (rect.bottom - edgeZone)) / edgeZone));
+      autoScrollSpeedRef.current = Math.round(factor * maxSpeed);
+    } else {
+      autoScrollSpeedRef.current = 0;
+    }
+  };
+
+  // Lock body scroll when modal is open and cleanup auto-scroll
   useEffect(() => {
     if (isOpen) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = originalOverflow;
+        stopAutoScroll();
       };
     }
   }, [isOpen]);
@@ -229,6 +296,9 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
       setItems(workout.items ? JSON.parse(JSON.stringify(workout.items)) : []);
       setShowDeleteConfirm(false);
       setError(null);
+      setDraggedIdx(null);
+      setDragOverIdx(null);
+      stopAutoScroll();
     }
   }, [workout, isOpen]);
 
@@ -236,6 +306,62 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
 
   const displayDate = formatWorkoutDate(dateIso);
 
+  const handleReorder = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) return;
+    setItems((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  };
+
+  const handleTouchStart = (idx: number, e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    lastPointerPosRef.current = { x: touch.clientX, y: touch.clientY };
+    setDraggedIdx(idx);
+    setDragOverIdx(idx);
+    startAutoScroll();
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggedIdx === null) return;
+    const touch = e.touches[0];
+    lastPointerPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    updateAutoScrollSpeed(touch.clientY);
+
+    if (listContainerRef.current) {
+      const rect = listContainerRef.current.getBoundingClientRect();
+      if (touch.clientY < rect.top) {
+        setDragOverIdx(0);
+        return;
+      }
+      if (touch.clientY > rect.bottom) {
+        setDragOverIdx(items.length - 1);
+        return;
+      }
+    }
+
+    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = elem?.closest("[data-item-index]");
+    if (card) {
+      const targetIdx = Number(card.getAttribute("data-item-index"));
+      if (!isNaN(targetIdx) && targetIdx !== dragOverIdx) {
+        setDragOverIdx(targetIdx);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    stopAutoScroll();
+    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx) {
+      handleReorder(draggedIdx, dragOverIdx);
+    }
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+    lastPointerPosRef.current = null;
+  };
 
   const handleItemNameChange = (index: number, newName: string) => {
     setItems((prev) => {
@@ -514,13 +640,79 @@ export const EditWorkoutModal: React.FC<EditWorkoutModalProps> = ({
           <div
             ref={listContainerRef}
             data-scroll-container="true"
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (draggedIdx !== null) {
+                lastPointerPosRef.current = { x: e.clientX, y: e.clientY };
+                updateAutoScrollSpeed(e.clientY);
+              }
+            }}
+            onDragLeave={() => {
+              autoScrollSpeedRef.current = 0;
+            }}
             className="flex-1 overflow-y-auto px-5 pb-4 space-y-3"
           >
             {items.map((item, idx) => (
               <div
                 key={item.id || idx}
-                className="p-3.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 hover:border-zinc-700/60 transition-colors flex items-center gap-3.5"
+                data-item-index={idx}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (draggedIdx !== null && dragOverIdx !== idx) {
+                    setDragOverIdx(idx);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  stopAutoScroll();
+                  if (draggedIdx !== null && draggedIdx !== idx) {
+                    handleReorder(draggedIdx, idx);
+                  }
+                  setDraggedIdx(null);
+                  setDragOverIdx(null);
+                  lastPointerPosRef.current = null;
+                }}
+                className={`p-3 sm:p-3.5 rounded-xl border transition-all flex items-center gap-2 sm:gap-2.5 ${
+                  draggedIdx === idx
+                    ? "opacity-40 border-dashed border-emerald-500/60 bg-zinc-950/40"
+                    : dragOverIdx === idx && draggedIdx !== null
+                    ? "border-emerald-500/90 bg-emerald-500/5 shadow-md shadow-emerald-500/10 scale-[1.01]"
+                    : "bg-zinc-950/70 border-zinc-800/80 hover:border-zinc-700/60"
+                }`}
               >
+                {/* Drag Reorder Handle: Ultra-compact, occupying virtually zero extra layout space */}
+                <div
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", `${idx}`);
+                    setDraggedIdx(idx);
+                    startAutoScroll();
+                  }}
+                  onDragEnd={() => {
+                    stopAutoScroll();
+                    setDraggedIdx(null);
+                    setDragOverIdx(null);
+                    lastPointerPosRef.current = null;
+                  }}
+                  onTouchStart={(e) => handleTouchStart(idx, e)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-zinc-600 hover:text-zinc-300 transition-colors shrink-0 flex items-center justify-center select-none touch-none"
+                  title="Drag to reorder exercise"
+                  aria-label="Drag to reorder exercise"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                    <circle cx="5" cy="3.5" r="1.2" />
+                    <circle cx="11" cy="3.5" r="1.2" />
+                    <circle cx="5" cy="8" r="1.2" />
+                    <circle cx="11" cy="8" r="1.2" />
+                    <circle cx="5" cy="12.5" r="1.2" />
+                    <circle cx="11" cy="12.5" r="1.2" />
+                  </svg>
+                </div>
+
                 {/* Silhouette Icon: Perfectly Centered */}
                 <div className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800/90 flex flex-col items-center justify-center shrink-0 w-[68px] min-w-[68px] self-center">
                   <MuscleIcon
