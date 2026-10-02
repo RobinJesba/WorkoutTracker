@@ -123,9 +123,15 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
   const existing = (existingRes.results?.[0] as { id: string; date: string; title: string }) || null;
 
   if (existing) {
-    // Merge: Append new items to the existing workout
     const targetWorkoutId = existing.id;
 
+    // If workout.id is the existing workout id, replace all items in-place (no duplicates)
+    if (workout.id === targetWorkoutId) {
+      await updateWorkout({ ...workout, id: targetWorkoutId, date: standardDate });
+      return { success: true, id: targetWorkoutId, merged: true };
+    }
+
+    // Merge: Append new items to the existing workout
     // Update parent title if updated title is provided
     if (workout.title && workout.title.trim() && workout.title.trim() !== existing.title) {
       await db.prepare(
@@ -205,10 +211,12 @@ export async function updateWorkout(workout: WorkoutEntry): Promise<{ success: b
     throw new Error("Cloudflare D1 database is not connected.");
   }
 
+  const standardDate = formatWorkoutDate(workout.date);
+
   // Update workout info
   await db.prepare(
     "UPDATE workouts SET date = ?, title = ? WHERE id = ?"
-  ).bind(workout.date, workout.title, workout.id).run();
+  ).bind(standardDate, workout.title, workout.id).run();
 
   // Replace items
   if (workout.items) {

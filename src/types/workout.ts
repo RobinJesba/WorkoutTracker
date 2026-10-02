@@ -8,6 +8,7 @@ export interface WorkoutItem {
   primaryMuscles?: string[];
   secondaryMuscles?: string[];
   details: string;
+  isExisting?: boolean;
 }
 
 export interface WorkoutEntry {

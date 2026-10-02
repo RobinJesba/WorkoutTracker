@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { MuscleIcon } from "./MuscleIcon";
 import { WorkoutEntry, WorkoutItem } from "@/types/workout";
 import { formatWorkoutDate, getTodayIso, isSameWorkoutDay } from "@/lib/date";
@@ -34,6 +34,17 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   // Parsed Preview State
   const [parsedTitle, setParsedTitle] = useState<string>("");
   const [parsedItems, setParsedItems] = useState<WorkoutItem[] | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedDateIso(getTodayIso());
+      setRawText("");
+      setParsedItems(null);
+      setParsedTitle("");
+      setParseError(null);
+      setSaveError(null);
+    }
+  }, [isOpen]);
 
   const handleOpenDatePicker = () => {
     if (dateInputRef.current) {
@@ -77,8 +88,21 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
       }
 
       const data = await res.json();
+      const newItems: WorkoutItem[] = (data.items || []).map((item: any) => ({
+        ...item,
+        isExisting: false,
+      }));
+
+      const existingItems: WorkoutItem[] = (existingWorkoutForDate?.items || []).map((item) => ({
+        ...item,
+        isExisting: true,
+      }));
+
+      // Combine all existing workouts with the newly parsed workouts
+      const allItems: WorkoutItem[] = [...existingItems, ...newItems];
+
       setParsedTitle(data.title || existingWorkoutForDate?.title || "Workout Session");
-      setParsedItems(data.items || []);
+      setParsedItems(allItems);
     } catch (err: any) {
       setParseError(err.message || "Failed to process workout notes");
     } finally {
@@ -101,21 +125,25 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     setSaveError(null);
 
     const titleToUse = parsedTitle.trim() || existingWorkoutForDate?.title || "Workout Session";
+    const isUpdating = Boolean(existingWorkoutForDate);
 
-    const newWorkoutPayload: WorkoutEntry = {
+    // Clean UI-only flags before persisting
+    const sanitizedItems: WorkoutItem[] = parsedItems.map(({ isExisting, ...rest }) => rest);
+
+    const workoutPayload: WorkoutEntry = {
       id: existingWorkoutForDate?.id || `workout-${Date.now()}`,
       date: displayDate,
       title: titleToUse,
-      items: parsedItems,
+      items: sanitizedItems,
     };
 
     try {
       const res = await fetch("/api/workouts", {
-        method: "POST",
+        method: isUpdating ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(newWorkoutPayload),
+        body: JSON.stringify(workoutPayload),
       });
 
       if (!res.ok) {
@@ -123,11 +151,8 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
         throw new Error(err.error || "Failed to save workout to database");
       }
 
-      const resData = await res.json().catch(() => ({}));
-      const isMerged = Boolean(resData.merged || existingWorkoutForDate);
-
       // Notify parent to update local state & cache
-      onWorkoutSaved(newWorkoutPayload, isMerged);
+      onWorkoutSaved(workoutPayload, isUpdating);
       handleReset();
       onClose();
     } catch (err: any) {
@@ -183,8 +208,11 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
               {/* Entire button is clickable and triggers native date picker */}
               <button
                 type="button"
-                onClick={handleOpenDatePicker}
-                className="w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 hover:border-zinc-700 transition-colors text-left cursor-pointer active:bg-zinc-900"
+                onClick={parsedItems ? undefined : handleOpenDatePicker}
+                disabled={Boolean(parsedItems)}
+                className={`w-full flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm font-mono text-zinc-100 transition-colors text-left ${
+                  parsedItems ? "opacity-60 cursor-not-allowed" : "hover:border-zinc-700 cursor-pointer active:bg-zinc-900"
+                }`}
               >
                 <span className="font-mono text-zinc-100 font-medium tracking-tight">
                   {displayDate}
@@ -239,7 +267,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
               <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
                 <div>
                   <h3 className="text-sm font-semibold text-zinc-100 tracking-tight">
-                    {existingWorkoutForDate ? existingWorkoutForDate.title : parsedTitle || "Workout Session"}
+                    {parsedTitle || existingWorkoutForDate?.title || "Workout Session"}
                   </h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs font-mono text-zinc-400">{displayDate}</span>
@@ -282,6 +310,16 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
                         <span className="font-semibold text-zinc-100 text-xs sm:text-sm truncate">
                           {item.name}
                         </span>
+                        {item.isExisting && (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase bg-zinc-800 text-zinc-400 border border-zinc-700/60">
+                            Logged
+                          </span>
+                        )}
+                        {!item.isExisting && existingWorkoutForDate && (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            New
+                          </span>
+                        )}
                         <div className="flex flex-wrap items-center gap-1">
                           {(item.primaryMuscles || item.targetMuscles)?.map((m) => (
                             <span

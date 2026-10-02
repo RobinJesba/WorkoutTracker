@@ -79,12 +79,13 @@ export default function WorkoutListPage() {
       const existingIndex = prev.findIndex((w) => isSameWorkoutDay(w.date, formattedWorkout.date));
       if (existingIndex >= 0) {
         const existing = prev[existingIndex];
-        // Append newly added items to existing workout
+        // The formattedWorkout already has all merged items (existing + new)
         const mergedWorkout: WorkoutEntry = {
           ...existing,
+          id: formattedWorkout.id || existing.id,
           date: formatWorkoutDate(formattedWorkout.date),
           title: formattedWorkout.title || existing.title,
-          items: [...existing.items, ...formattedWorkout.items],
+          items: formattedWorkout.items,
         };
         const updated = [...prev];
         updated[existingIndex] = mergedWorkout;
@@ -101,7 +102,7 @@ export default function WorkoutListPage() {
       }
     });
 
-    setToastMessage(isMerged ? "Workout merged & synced to D1" : "Workout saved & synced to D1");
+    setToastMessage(isMerged ? "Workout updated & synced to D1" : "Workout saved & synced to D1");
     setTimeout(() => setToastMessage(null), 3500);
   };
 
