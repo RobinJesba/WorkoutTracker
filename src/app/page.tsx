@@ -250,17 +250,6 @@ export default function WorkoutListPage() {
         )}
       </main>
 
-      {/* Mobile Floating Action Button */}
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="sm:hidden fixed bottom-6 right-5 z-40 flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-4 py-3 rounded-full shadow-lg shadow-emerald-950/50 active:scale-95 transition-all"
-        title="Log Workout"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        <span className="text-xs font-bold uppercase tracking-wider">Log</span>
-      </button>
 
       {/* Sync Toast Notification */}
       {toastMessage && (
