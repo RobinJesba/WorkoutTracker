@@ -9,8 +9,20 @@ import { WorkoutEntry } from "@/types/workout";
 
 export const dynamic = "force-dynamic";
 
-// Strict API Key authorization
+// Strict API Key or Cloudflare Access authorization
 async function isAuthorized(req: NextRequest): Promise<boolean> {
+  // 1. Local development convenience
+  if (process.env.NODE_ENV === "development") {
+    return true;
+  }
+
+  // 2. Cloudflare Zero Trust Access: Authenticated via Google OAuth
+  const cfUserEmail = req.headers.get("cf-access-authenticated-user-email");
+  if (cfUserEmail) {
+    return true;
+  }
+
+  // 3. Strict API Key authorization for programmatic access
   let secretKey = process.env.WORKOUT_API_KEY;
 
   if (!secretKey) {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
 import { MuscleIcon } from "@/components/MuscleIcon";
+import { QuickLogModal } from "@/components/QuickLogModal";
 import { WorkoutEntry } from "@/types/workout";
 
 const CACHE_KEY = "robin_workouts_v3";
@@ -10,6 +11,8 @@ const CACHE_KEY = "robin_workouts_v3";
 export default function WorkoutListPage() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>(INITIAL_WORKOUTS);
   const [isOffline, setIsOffline] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Client-Side Cache (Instant render & Offline Gym Mode)
   useEffect(() => {
@@ -54,11 +57,22 @@ export default function WorkoutListPage() {
     }
   }, []);
 
+  const handleWorkoutSaved = (newWorkout: WorkoutEntry) => {
+    // Avoid duplicate IDs if already present
+    const updated = [newWorkout, ...workouts.filter((w) => w.id !== newWorkout.id)];
+    setWorkouts(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+    }
+    setToastMessage("Workout saved & synced to D1");
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800">
       {/* Top minimal bar (with safe area inset for notch/island) */}
       <header 
-        className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3.5 sm:py-4"
+        className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3 sm:py-3.5"
         style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
       >
         <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -71,10 +85,24 @@ export default function WorkoutListPage() {
               title={isOffline ? "Offline (Serving from cache)" : "Live Synced"}
             />
           </div>
-          <span className="text-xs font-mono text-zinc-400">
-            {workouts.length} {workouts.length === 1 ? "entry" : "entries"}
-            {isOffline && " • Offline"}
-          </span>
+          
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono text-zinc-400 hidden sm:inline">
+              {workouts.length} {workouts.length === 1 ? "entry" : "entries"}
+              {isOffline && " • Offline"}
+            </span>
+
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm"
+              title="Log new workout with AI"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <span>Log Workout</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -158,6 +186,33 @@ export default function WorkoutListPage() {
           ))}
         </div>
       </main>
+
+      {/* Mobile Floating Action Button */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="sm:hidden fixed bottom-6 right-5 z-40 flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold px-4 py-3 rounded-full shadow-lg shadow-emerald-950/50 active:scale-95 transition-all"
+        title="Log Workout"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        <span className="text-xs font-bold uppercase tracking-wider">Log</span>
+      </button>
+
+      {/* Sync Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-zinc-900/95 border border-emerald-500/40 text-emerald-400 text-xs font-mono px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-md">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Quick Log AI Modal */}
+      <QuickLogModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onWorkoutSaved={handleWorkoutSaved}
+      />
     </div>
   );
 }

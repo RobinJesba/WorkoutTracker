@@ -131,7 +131,10 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
         id,
         item.name,
         item.muscleGroup,
-        JSON.stringify(item.targetMuscles || []),
+        JSON.stringify({
+          primary: item.primaryMuscles || item.targetMuscles || [],
+          secondary: item.secondaryMuscles || [],
+        }),
         item.details,
         i + 1
       ).run();
@@ -167,7 +170,10 @@ export async function updateWorkout(workout: WorkoutEntry): Promise<{ success: b
         workout.id,
         item.name,
         item.muscleGroup,
-        JSON.stringify(item.targetMuscles || []),
+        JSON.stringify({
+          primary: item.primaryMuscles || item.targetMuscles || [],
+          secondary: item.secondaryMuscles || [],
+        }),
         item.details,
         i + 1
       ).run();

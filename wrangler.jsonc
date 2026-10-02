@@ -14,5 +14,8 @@
       "database_name": "workout-tracker-db",
       "database_id": "5ad4c992-cb18-46e0-a809-1eba3a01581e"
     }
-  ]
+  ],
+  "ai": {
+    "binding": "AI"
+  }
 }
