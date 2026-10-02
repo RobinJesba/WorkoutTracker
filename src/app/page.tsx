@@ -1,71 +1,50 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { INITIAL_WORKOUTS, ATHLETE_NAME } from "@/data/workouts";
+import { ATHLETE_NAME } from "@/data/workouts";
 import { MuscleIcon } from "@/components/MuscleIcon";
 import { QuickLogModal } from "@/components/QuickLogModal";
 import { WorkoutEntry } from "@/types/workout";
 import { formatWorkoutDate, isSameWorkoutDay } from "@/lib/date";
 
-const CACHE_KEY = "robin_workouts_v3";
-
 export default function WorkoutListPage() {
-  const [workouts, setWorkouts] = useState<WorkoutEntry[]>(() =>
-    INITIAL_WORKOUTS.map((w) => ({ ...w, date: formatWorkoutDate(w.date) }))
-  );
-  const [isOffline, setIsOffline] = useState(false);
+  const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Client-Side Cache (Instant render & Offline Gym Mode)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // 1. Load from localStorage immediately (0ms delay)
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setWorkouts(
-              parsed.map((w: WorkoutEntry) => ({
-                ...w,
-                date: formatWorkoutDate(w.date),
-              }))
-            );
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to load local workout cache", e);
-      }
-
-      // 2. Track online/offline status
-      setIsOffline(!navigator.onLine);
-      const handleOnline = () => setIsOffline(false);
-      const handleOffline = () => setIsOffline(true);
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-
-      // 3. Fetch fresh data from Edge API in background
-      fetch("/api/workouts")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.workouts && Array.isArray(data.workouts) && data.workouts.length > 0) {
-            const formatted = data.workouts.map((w: WorkoutEntry) => ({
+  const loadWorkouts = async () => {
+    try {
+      const res = await fetch("/api/workouts");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.workouts)) {
+          setWorkouts(
+            data.workouts.map((w: WorkoutEntry) => ({
               ...w,
               date: formatWorkoutDate(w.date),
-            }));
-            setWorkouts(formatted);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(formatted));
-          }
-        })
-        .catch(() => {
-          // Keep cached data seamlessly
-        });
+            }))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch workouts from D1:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      return () => {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-      };
+  // Direct Cloudflare D1 fetch on mount & purge legacy localStorage keys
+  useEffect(() => {
+    loadWorkouts();
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("robin_workouts_v3");
+        localStorage.removeItem("workout_tracker_workouts_cache_v1");
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
@@ -89,21 +68,17 @@ export default function WorkoutListPage() {
         };
         const updated = [...prev];
         updated[existingIndex] = mergedWorkout;
-        if (typeof window !== "undefined") {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
-        }
         return updated;
       } else {
-        const updated = [formattedWorkout, ...prev];
-        if (typeof window !== "undefined") {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
-        }
-        return updated;
+        return [formattedWorkout, ...prev];
       }
     });
 
     setToastMessage(isMerged ? "Workout merged & synced to D1" : "Workout saved & synced to D1");
     setTimeout(() => setToastMessage(null), 3500);
+
+    // Refresh from D1 in background for complete server parity
+    loadWorkouts();
   };
 
   return (
@@ -119,15 +94,14 @@ export default function WorkoutListPage() {
               {ATHLETE_NAME}'s Workout Log
             </h1>
             <span 
-              className={`w-1.5 h-1.5 rounded-full ${isOffline ? "bg-amber-400" : "bg-emerald-400"}`} 
-              title={isOffline ? "Offline (Serving from cache)" : "Live Synced"}
+              className="w-1.5 h-1.5 rounded-full bg-emerald-400" 
+              title="Live Synced with Cloudflare D1"
             />
           </div>
           
           <div className="flex items-center gap-3">
             <span className="text-xs font-mono text-zinc-400 hidden sm:inline">
               {workouts.length} {workouts.length === 1 ? "entry" : "entries"}
-              {isOffline && " • Offline"}
             </span>
 
             <button
@@ -149,80 +123,110 @@ export default function WorkoutListPage() {
         className="flex-1 max-w-2xl w-full mx-auto px-3.5 sm:px-6 py-5 sm:py-8"
         style={{ paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="space-y-5 sm:space-y-6">
-          {workouts.map((workout) => (
-            <article
-              key={workout.id}
-              className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 sm:p-5 hover:border-zinc-700/80 transition-colors shadow-sm"
-            >
-              {/* Date & Title */}
-              <div className="flex items-baseline justify-between border-b border-zinc-800/60 pb-3 mb-3.5">
-                <h2 className="text-sm sm:text-base font-semibold text-zinc-100 tracking-tight">
-                  {workout.title}
-                </h2>
-                <time className="text-xs font-mono text-zinc-400 shrink-0 ml-2">
-                  {formatWorkoutDate(workout.date)}
-                </time>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div
+                key={i}
+                className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-4 sm:p-5 animate-pulse space-y-3"
+              >
+                <div className="flex items-center justify-between border-b border-zinc-800/40 pb-3">
+                  <div className="h-4 bg-zinc-800 rounded w-44" />
+                  <div className="h-3 bg-zinc-800/80 rounded w-28" />
+                </div>
+                <div className="space-y-2.5">
+                  <div className="h-16 bg-zinc-950/60 border border-zinc-800/40 rounded-lg" />
+                  <div className="h-16 bg-zinc-950/60 border border-zinc-800/40 rounded-lg" />
+                </div>
               </div>
+            ))}
+          </div>
+        ) : workouts.length === 0 ? (
+          <div className="text-center py-16 px-4 border border-dashed border-zinc-800/80 rounded-2xl bg-zinc-900/20">
+            <p className="text-sm font-mono text-zinc-400">No workout logs found.</p>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="mt-3 text-xs font-mono text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+            >
+              + Log your first workout
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5 sm:space-y-6">
+            {workouts.map((workout) => (
+              <article
+                key={workout.id}
+                className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 sm:p-5 hover:border-zinc-700/80 transition-colors shadow-sm"
+              >
+                {/* Date & Title */}
+                <div className="flex items-baseline justify-between border-b border-zinc-800/60 pb-3 mb-3.5">
+                  <h2 className="text-sm sm:text-base font-semibold text-zinc-100 tracking-tight">
+                    {workout.title}
+                  </h2>
+                  <time className="text-xs font-mono text-zinc-400 shrink-0 ml-2">
+                    {formatWorkoutDate(workout.date)}
+                  </time>
+                </div>
 
-              {/* Items List */}
-              <ul className="space-y-3">
-                {workout.items.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center gap-3.5 p-3 rounded-lg bg-zinc-950/60 border border-zinc-800/60 hover:border-zinc-700/60 transition-colors"
-                  >
-                    {/* Anatomical Target Muscle Silhouette Icon */}
-                    <div 
-                      className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800/90 flex flex-col items-center justify-center shrink-0 w-[68px] min-w-[68px]"
-                      title={`Targeted muscles: ${(item.primaryMuscles || item.targetMuscles)?.join(", ")}${item.secondaryMuscles?.length ? ` (Secondary: ${item.secondaryMuscles.join(", ")})` : ""}`}
+                {/* Items List */}
+                <ul className="space-y-3">
+                  {workout.items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex items-center gap-3.5 p-3 rounded-lg bg-zinc-950/60 border border-zinc-800/60 hover:border-zinc-700/60 transition-colors"
                     >
-                      <MuscleIcon 
-                        targetMuscles={item.targetMuscles} 
-                        primaryMuscles={item.primaryMuscles}
-                        secondaryMuscles={item.secondaryMuscles}
-                        muscleGroup={item.muscleGroup} 
-                        size={24} 
-                      />
-                    </div>
-
-                    {/* Exercise Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                        <span className="font-semibold text-zinc-100 text-sm leading-snug">
-                          {item.name}
-                        </span>
-                        <div className="flex flex-wrap items-center gap-1">
-                          {(item.primaryMuscles || item.targetMuscles)?.map((muscle) => (
-                            <span
-                              key={muscle}
-                              className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide bg-zinc-800/90 text-emerald-400 border border-emerald-400/20"
-                              title="Primary target muscle"
-                            >
-                              {muscle}
-                            </span>
-                          ))}
-                          {item.secondaryMuscles?.map((muscle) => (
-                            <span
-                              key={muscle}
-                              className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-wide bg-zinc-900/90 text-zinc-400 border border-zinc-700/60"
-                              title="Secondary synergist muscle"
-                            >
-                              + {muscle}
-                            </span>
-                          ))}
-                        </div>
+                      {/* Anatomical Target Muscle Silhouette Icon */}
+                      <div 
+                        className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800/90 flex flex-col items-center justify-center shrink-0 w-[68px] min-w-[68px]"
+                        title={`Targeted muscles: ${(item.primaryMuscles || item.targetMuscles)?.join(", ")}${item.secondaryMuscles?.length ? ` (Secondary: ${item.secondaryMuscles.join(", ")})` : ""}`}
+                      >
+                        <MuscleIcon 
+                          targetMuscles={item.targetMuscles} 
+                          primaryMuscles={item.primaryMuscles}
+                          secondaryMuscles={item.secondaryMuscles}
+                          muscleGroup={item.muscleGroup} 
+                          size={24} 
+                        />
                       </div>
-                      <p className="text-zinc-300 font-mono text-xs sm:text-sm leading-relaxed break-words">
-                        {item.details}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
+
+                      {/* Exercise Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="font-semibold text-zinc-100 text-sm leading-snug">
+                            {item.name}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {(item.primaryMuscles || item.targetMuscles)?.map((muscle) => (
+                              <span
+                                key={muscle}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide bg-zinc-800/90 text-emerald-400 border border-emerald-400/20"
+                                title="Primary target muscle"
+                              >
+                                {muscle}
+                              </span>
+                            ))}
+                            {item.secondaryMuscles?.map((muscle) => (
+                              <span
+                                key={muscle}
+                                className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase tracking-wide bg-zinc-900/90 text-zinc-400 border border-zinc-700/60"
+                                title="Secondary synergist muscle"
+                              >
+                                + {muscle}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-zinc-300 font-mono text-xs sm:text-sm leading-relaxed break-words">
+                          {item.details}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        )}
       </main>
 
       {/* Mobile Floating Action Button */}
