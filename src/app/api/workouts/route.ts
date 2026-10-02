@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await createWorkout(body);
-    return NextResponse.json({ success: true, id: result.id }, { status: 201 });
+    return NextResponse.json({ success: true, id: result.id, merged: result.merged }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(
       { error: "Failed to create workout", details: error?.message },

@@ -105,13 +105,57 @@ export async function getWorkouts(): Promise<WorkoutEntry[]> {
   return INITIAL_WORKOUTS;
 }
 
-// 2. CREATE WORKOUT
-export async function createWorkout(workout: WorkoutEntry): Promise<{ success: boolean; id: string }> {
+// 2. CREATE (OR MERGE) WORKOUT
+export async function createWorkout(workout: WorkoutEntry): Promise<{ success: boolean; id: string; merged?: boolean }> {
   const { db } = await getDB();
   if (!db) {
     throw new Error("Cloudflare D1 database is not connected.");
   }
 
+  // 1. Check if a workout with this exact date already exists
+  const existingRes = await db.prepare(
+    "SELECT id, date, title FROM workouts WHERE date = ? LIMIT 1"
+  ).bind(workout.date).all();
+
+  const existing = (existingRes.results?.[0] as { id: string; date: string; title: string }) || null;
+
+  if (existing) {
+    // Merge: Append new items to the existing workout
+    const targetWorkoutId = existing.id;
+
+    // Get current max sort_order
+    const maxSortRes = await db.prepare(
+      "SELECT MAX(sort_order) as max_sort FROM workout_items WHERE workout_id = ?"
+    ).bind(targetWorkoutId).all();
+
+    const maxSort = Number((maxSortRes.results?.[0] as any)?.max_sort) || 0;
+    const startOrder = maxSort + 1;
+
+    if (workout.items && workout.items.length > 0) {
+      for (let i = 0; i < workout.items.length; i++) {
+        const item = workout.items[i];
+        const itemId = item.id || `item-${Date.now()}-${i}`;
+        await db.prepare(
+          "INSERT INTO workout_items (id, workout_id, name, muscle_group, target_muscles, details, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(
+          itemId,
+          targetWorkoutId,
+          item.name,
+          item.muscleGroup,
+          JSON.stringify({
+            primary: item.primaryMuscles || item.targetMuscles || [],
+            secondary: item.secondaryMuscles || [],
+          }),
+          item.details,
+          startOrder + i
+        ).run();
+      }
+    }
+
+    return { success: true, id: targetWorkoutId, merged: true };
+  }
+
+  // 2. Otherwise create a new workout
   const id = workout.id || `workout-${Date.now()}`;
 
   // Insert parent workout
@@ -141,7 +185,7 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
     }
   }
 
-  return { success: true, id };
+  return { success: true, id, merged: false };
 }
 
 // 3. UPDATE WORKOUT

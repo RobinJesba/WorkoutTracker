@@ -57,14 +57,32 @@ export default function WorkoutListPage() {
     }
   }, []);
 
-  const handleWorkoutSaved = (newWorkout: WorkoutEntry) => {
-    // Avoid duplicate IDs if already present
-    const updated = [newWorkout, ...workouts.filter((w) => w.id !== newWorkout.id)];
-    setWorkouts(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
-    }
-    setToastMessage("Workout saved & synced to D1");
+  const handleWorkoutSaved = (savedWorkout: WorkoutEntry, isMerged?: boolean) => {
+    setWorkouts((prev) => {
+      const existingIndex = prev.findIndex((w) => w.date === savedWorkout.date);
+      if (existingIndex >= 0) {
+        const existing = prev[existingIndex];
+        // Append newly added items to existing workout
+        const mergedWorkout: WorkoutEntry = {
+          ...existing,
+          items: [...existing.items, ...savedWorkout.items],
+        };
+        const updated = [...prev];
+        updated[existingIndex] = mergedWorkout;
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      } else {
+        const updated = [savedWorkout, ...prev];
+        if (typeof window !== "undefined") {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      }
+    });
+
+    setToastMessage(isMerged ? "Workout merged & synced to D1" : "Workout saved & synced to D1");
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -212,6 +230,7 @@ export default function WorkoutListPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onWorkoutSaved={handleWorkoutSaved}
+        existingWorkouts={workouts}
       />
     </div>
   );
