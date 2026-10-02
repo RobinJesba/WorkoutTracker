@@ -241,7 +241,8 @@ NEW WORKOUT NOTES TO ADD:
 ${text}
 
 TASK:
-1. Parse the NEW WORKOUT NOTES into structured items.
+1. Parse ONLY the "NEW WORKOUT NOTES TO ADD" into structured items.
+CRITICAL: The "items" array in your JSON output MUST ONLY contain the exercises parsed from "NEW WORKOUT NOTES TO ADD". Do NOT include any of the existing completed exercises in "items". The existing exercises are provided strictly to help you evaluate and update the overall "title".
 2. Determine the overall workout "title" for the entire day (considering existing exercises + new exercises):
    - If the existing title "${existingTitle || 'Workout Session'}" is still accurate for the combined day, KEEP IT.
    - If the new exercises change or expand the scope (e.g. adding cardio to upper body, adding legs, or changing muscle focus), provide an updated, concise, professional title.`;
@@ -283,6 +284,21 @@ TASK:
       } catch (e) {
         console.warn("Failed to parse Llama 3.3 output as JSON, using fallback", e);
       }
+    }
+
+    // Guardrail: Ensure existing exercises are not accidentally included in items unless mentioned in new notes
+    if (existingExercises.length > 0 && parsedResult?.items) {
+      const lowerText = text.toLowerCase();
+      parsedResult.items = parsedResult.items.filter((item) => {
+        const isExistingName = existingExercises.some(
+          (ex: string) => ex.trim().toLowerCase() === item.name.trim().toLowerCase()
+        );
+        if (isExistingName) {
+          const firstWord = item.name.split(" ")[0].toLowerCase();
+          return lowerText.includes(item.name.toLowerCase()) || (firstWord.length > 3 && lowerText.includes(firstWord));
+        }
+        return true;
+      });
     }
 
     // Fallback if AI not available or returned non-JSON

@@ -125,12 +125,6 @@ export async function createWorkout(workout: WorkoutEntry): Promise<{ success: b
   if (existing) {
     const targetWorkoutId = existing.id;
 
-    // If workout.id is the existing workout id, replace all items in-place (no duplicates)
-    if (workout.id === targetWorkoutId) {
-      await updateWorkout({ ...workout, id: targetWorkoutId, date: standardDate });
-      return { success: true, id: targetWorkoutId, merged: true };
-    }
-
     // Merge: Append new items to the existing workout
     // Update parent title if updated title is provided
     if (workout.title && workout.title.trim() && workout.title.trim() !== existing.title) {

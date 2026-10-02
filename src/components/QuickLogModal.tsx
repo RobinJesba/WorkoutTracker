@@ -88,21 +88,8 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
       }
 
       const data = await res.json();
-      const newItems: WorkoutItem[] = (data.items || []).map((item: any) => ({
-        ...item,
-        isExisting: false,
-      }));
-
-      const existingItems: WorkoutItem[] = (existingWorkoutForDate?.items || []).map((item) => ({
-        ...item,
-        isExisting: true,
-      }));
-
-      // Combine all existing workouts with the newly parsed workouts
-      const allItems: WorkoutItem[] = [...existingItems, ...newItems];
-
       setParsedTitle(data.title || existingWorkoutForDate?.title || "Workout Session");
-      setParsedItems(allItems);
+      setParsedItems(data.items || []);
     } catch (err: any) {
       setParseError(err.message || "Failed to process workout notes");
     } finally {
@@ -125,25 +112,21 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     setSaveError(null);
 
     const titleToUse = parsedTitle.trim() || existingWorkoutForDate?.title || "Workout Session";
-    const isUpdating = Boolean(existingWorkoutForDate);
 
-    // Clean UI-only flags before persisting
-    const sanitizedItems: WorkoutItem[] = parsedItems.map(({ isExisting, ...rest }) => rest);
-
-    const workoutPayload: WorkoutEntry = {
+    const newWorkoutPayload: WorkoutEntry = {
       id: existingWorkoutForDate?.id || `workout-${Date.now()}`,
       date: displayDate,
       title: titleToUse,
-      items: sanitizedItems,
+      items: parsedItems,
     };
 
     try {
       const res = await fetch("/api/workouts", {
-        method: isUpdating ? "PUT" : "POST",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(workoutPayload),
+        body: JSON.stringify(newWorkoutPayload),
       });
 
       if (!res.ok) {
@@ -151,8 +134,11 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
         throw new Error(err.error || "Failed to save workout to database");
       }
 
+      const resData = await res.json().catch(() => ({}));
+      const isMerged = Boolean(resData.merged || existingWorkoutForDate);
+
       // Notify parent to update local state & cache
-      onWorkoutSaved(workoutPayload, isUpdating);
+      onWorkoutSaved(newWorkoutPayload, isMerged);
       handleReset();
       onClose();
     } catch (err: any) {
@@ -310,16 +296,6 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
                         <span className="font-semibold text-zinc-100 text-xs sm:text-sm truncate">
                           {item.name}
                         </span>
-                        {item.isExisting && (
-                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase bg-zinc-800 text-zinc-400 border border-zinc-700/60">
-                            Logged
-                          </span>
-                        )}
-                        {!item.isExisting && existingWorkoutForDate && (
-                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            New
-                          </span>
-                        )}
                         <div className="flex flex-wrap items-center gap-1">
                           {(item.primaryMuscles || item.targetMuscles)?.map((m) => (
                             <span
