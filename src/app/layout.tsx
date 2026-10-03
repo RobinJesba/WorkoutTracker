@@ -12,9 +12,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const athleteName = process.env.NEXT_PUBLIC_ATHLETE_NAME || "Robin";
+
 export const metadata: Metadata = {
-  title: "Robin's Workout Log",
-  description: "Minimalist private workout tracker for Robin & Coach",
+  title: `${athleteName}'s Workout Log`,
+  description: "Minimalist, AI-powered workout tracker with anatomical muscle highlighting",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

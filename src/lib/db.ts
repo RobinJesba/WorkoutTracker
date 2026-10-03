@@ -1,4 +1,4 @@
-import { WorkoutEntry, WorkoutItem } from "@/types/workout";
+import { WorkoutEntry } from "@/types/workout";
 import { INITIAL_WORKOUTS } from "@/data/workouts";
 import { findUnifiedExercise } from "@/lib/exerciseDatabase";
 import { formatWorkoutDate } from "@/lib/date";

@@ -1,6 +1,6 @@
 import { WorkoutEntry } from "@/types/workout";
 
-export const ATHLETE_NAME = "Robin";
+export const ATHLETE_NAME = process.env.NEXT_PUBLIC_ATHLETE_NAME || "Robin";
 
 export const INITIAL_WORKOUTS: WorkoutEntry[] = [
   {

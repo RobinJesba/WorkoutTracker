@@ -101,7 +101,6 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
   const qHasDeadlift = /\bdeadlifts?\b|\brdl\b/i.test(q);
   const qHasPress = /\bpress(es)?\b|\bpush-?ups?\b|\bdips?\b/i.test(q);
   const qHasPull = /\bpulls?\b|\bpulldowns?\b|\brows?\b|\bchin-?ups?\b/i.test(q);
-  const qHasCurl = /\bcurls?\b/i.test(q);
 
   const scored = ALL_EXERCISES.map((ex) => {
     const name = ex.name.toLowerCase();

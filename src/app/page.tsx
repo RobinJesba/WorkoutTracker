@@ -100,7 +100,7 @@ export default function WorkoutListPage() {
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold text-zinc-100 tracking-tight">
-              {ATHLETE_NAME}'s Workout Log
+              {ATHLETE_NAME}&apos;s Workout Log
             </h1>
             <span 
               className="w-1.5 h-1.5 rounded-full bg-emerald-400" 
