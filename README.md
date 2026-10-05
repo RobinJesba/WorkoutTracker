@@ -11,10 +11,10 @@ Log your workouts the way you actually train: type or dictate messy shorthand no
 - **Natural Language AI Quick Logging**: Paste raw notes (e.g. `Dumbbell chest press - 10kg * 6, 7.5kg * 12`, `Scapula pullups 15reps, 10reps`, `Running: 5 sets 2 mins run @ 12km/h`). Meta Llama 3.3 70B running on Cloudflare Workers AI extracts structured data in sub-seconds.
 - **Dual-Silhouette Anatomical Visualizer**: Custom SVG anterior and posterior human body maps that illuminate primary (*emerald*) and secondary (*amber*) activated muscle groups for every exercise.
 - **Exercise Drag-and-Drop Reordering**: Smooth touch & mouse drag reordering with intelligent edge auto-scrolling for long sessions.
-- **Auto-Merge & Smart Session Titles**: Logging multiple times in one day? New exercises seamlessly append to the day's session, while the AI re-evaluates and updates the overall session title (e.g. *Upper Body Push* $\rightarrow$ *Full Body Strength & Intervals*).
-- **Comprehensive Exercise Catalog & Guardrails**: 800+ exercise dataset cross-referenced with a canonical dictionary, fuzzy anti-collision matching, and anatomical sanity guardrails (e.g. squats will never map to chest).
+- **Auto-Merge & Smart Session Titles**: Logging multiple times in one day? New exercises seamlessly append to the day's session, while the AI re-evaluates and updates the overall session title with warm-up/cool-down awareness (e.g. *Upper Body Push* $\rightarrow$ *Full Body Strength & Intervals*; brief $\le 15$ min warm-up walks keep focus on the primary lifting split).
+- **Comprehensive Exercise Catalog & Guardrails**: 800+ exercise dataset cross-referenced with a canonical dictionary, fuzzy anti-collision matching (e.g. treadmill walking will never collide with walking lunges or chest presses), and anatomical sanity guardrails.
 - **Serverless Edge Performance**: Deployed globally on Cloudflare Workers via OpenNext with zero cold starts, backed by Cloudflare D1 serverless SQLite.
-- **Zero Trust & API Key Security**: Safe for personal hosting. Mutations (`POST`, `PUT`, `DELETE`) are guarded by Cloudflare Zero Trust Access (Google OAuth) or an `x-api-key` header.
+- **Zero Trust & Role-Based Access Control**: Safe for personal and shared hosting. Admins configured via `ADMIN_EMAILS` have full editing and logging permissions. Other authenticated Cloudflare Access users (e.g. guests, teammates, or viewers) receive read-only access with disabled Edit and Submit buttons. External programmatic access is guarded via `x-api-key`.
 - **PWA & Mobile-First**: Installable to iOS/Android home screens with standalone display mode, dark UI, and notch/dynamic island safe area support.
 
 ---
@@ -70,6 +70,7 @@ cp .env.example .env.local
 | Variable | Required | Default | Description |
 | :--- | :---: | :---: | :--- |
 | `WORKOUT_API_KEY` | **Production** | *(none)* | Secret key used to authorize `POST`, `PUT`, and `DELETE` requests to `/api/workouts`. In local dev (`NODE_ENV=development`), auth is automatically bypassed for rapid testing. |
+| `ADMIN_EMAILS` | No | *(none)* | Comma-separated list of admin email addresses with full write/edit permissions. When set, any other user authenticated through Cloudflare Access is granted read-only access (Edit and Submit disabled). |
 | `NEXT_PUBLIC_ATHLETE_NAME` | No | `"Robin"` | Display name shown on the header banner and page title (e.g. `Alex's Workout Log`). |
 
 ### 2. Cloudflare Bindings (`wrangler.jsonc`)
