@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { EXERCISE_CATALOG_TEXT } from "@/data/exerciseCatalogNames";
-import { findUnifiedExercise } from "@/lib/exerciseDatabase";
+import { findUnifiedExercise, toTitleCase } from "@/lib/exerciseDatabase";
 import { WorkoutItem } from "@/types/workout";
 
 interface CloudflareEnv {
@@ -127,6 +127,17 @@ Parsed:
   "secondaryMuscles": ["Hamstrings", "Glutes", "Core"]
 }
 
+Example 9 (Cardio Machine - Stair / Step Climber):
+Input: "Step Climber Machine - Level 3 resistance for 10mins"
+Parsed:
+{
+  "name": "Stair Climber",
+  "details": "10 mins @ Level 3 resistance",
+  "isCustom": false,
+  "primaryMuscles": ["Quads", "Glutes", "Calves"],
+  "secondaryMuscles": ["Hamstrings", "Core"]
+}
+
 ### TITLE DETERMINATION GUIDELINES:
 1. For a brand new workout: Infer a concise, professional title (e.g. "Upper Body Pull & Push", "Leg Day & Intervals", "Chest & Shoulders", "Full Body Circuit").
 2. If existing workout context for the date is provided:
@@ -200,7 +211,7 @@ function fallbackLocalParse(text: string, existingTitle?: string) {
 
     return {
       id: `item-${Date.now()}-${idx}`,
-      name,
+      name: toTitleCase(name),
       muscleGroup: (match?.category?.toLowerCase() || primaryMuscles[0]?.toLowerCase() || "full-body") as any,
       targetMuscles: primaryMuscles,
       primaryMuscles,
@@ -321,14 +332,20 @@ CRITICAL: The "items" array in your JSON output MUST ONLY contain the exercises 
       // 1. Look up in unified database (which checks canonical dictionary first)
       const match = findUnifiedExercise(name);
       if (match) {
-        name = match.name;
-        if (match.primaryMuscles && match.primaryMuscles.length > 0) {
-          primary = match.primaryMuscles;
+        // If the item was flagged as custom and didn't match a canonical movement, preserve custom name
+        const isCanonicalMatch = match.source === "canonical";
+        if (!item.isCustom || isCanonicalMatch) {
+          name = match.name;
+          if (match.primaryMuscles && match.primaryMuscles.length > 0) {
+            primary = match.primaryMuscles;
+          }
+          if (match.secondaryMuscles && match.secondaryMuscles.length > 0) {
+            secondary = match.secondaryMuscles;
+          }
+          muscleGroup = match.category?.toLowerCase() || primary[0]?.toLowerCase() || "full-body";
+        } else {
+          muscleGroup = primary[0]?.toLowerCase() || "full-body";
         }
-        if (match.secondaryMuscles && match.secondaryMuscles.length > 0) {
-          secondary = match.secondaryMuscles;
-        }
-        muscleGroup = match.category?.toLowerCase() || primary[0]?.toLowerCase() || "full-body";
       } else {
         muscleGroup = primary[0]?.toLowerCase() || "full-body";
       }
@@ -354,7 +371,7 @@ CRITICAL: The "items" array in your JSON output MUST ONLY contain the exercises 
 
       return {
         id: `item-parsed-${Date.now()}-${idx}`,
-        name,
+        name: toTitleCase(name),
         muscleGroup: muscleGroup as any,
         targetMuscles: primary,
         primaryMuscles: primary,

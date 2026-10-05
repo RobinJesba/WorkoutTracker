@@ -74,6 +74,21 @@ export const CANONICAL_EXERCISES: CanonicalExercise[] = [
     secondaryMuscles: ["Hamstrings", "Calves", "Core"],
   },
   {
+    canonicalName: "Dumbbell Squat",
+    aliases: [
+      "dumbbell squat",
+      "dumbbell squats",
+      "db squat",
+      "db squats",
+      "dumbbell back squat",
+      "dumbbell front squat",
+      "db front squat",
+    ],
+    muscleGroup: "quads",
+    primaryMuscles: ["Quads", "Glutes"],
+    secondaryMuscles: ["Hamstrings", "Calves", "Core"],
+  },
+  {
     canonicalName: "Bulgarian Split Squats",
     aliases: [
       "bulgarian split squat",
@@ -454,6 +469,29 @@ export const CANONICAL_EXERCISES: CanonicalExercise[] = [
     muscleGroup: "full-body",
     primaryMuscles: ["Quads", "Calves"],
     secondaryMuscles: ["Hamstrings", "Glutes", "Core"],
+  },
+  {
+    canonicalName: "Stair Climber",
+    aliases: [
+      "stair climber",
+      "stair climbers",
+      "step climber",
+      "step climbers",
+      "step climber machine",
+      "stair climber machine",
+      "climber machine",
+      "stair master",
+      "stairmaster",
+      "stepmill",
+      "step mill",
+      "climbmill",
+      "climb mill",
+      "step machine",
+      "walking on stepmill",
+    ],
+    muscleGroup: "full-body",
+    primaryMuscles: ["Quads", "Glutes", "Calves"],
+    secondaryMuscles: ["Hamstrings", "Core"],
   },
 ];
 

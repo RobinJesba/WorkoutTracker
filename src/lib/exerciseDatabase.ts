@@ -37,6 +37,12 @@ export function normalizeMuscle(muscle: string): string {
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
+// Capitalize exercise names properly into Title Case
+export function toTitleCase(str: string): string {
+  if (!str) return "";
+  return str.replace(/\b[a-z]/g, (char) => char.toUpperCase());
+}
+
 // Build indexed database with canonical fundamentals prioritized first
 export const ALL_EXERCISES: UnifiedExercise[] = [
   ...CANONICAL_EXERCISES.map((c) => ({
@@ -61,7 +67,7 @@ export const ALL_EXERCISES: UnifiedExercise[] = [
   ...datasetExercisesData.map((ex) => ({
     id: `ed-${ex.id}`,
     source: "exercises-dataset" as const,
-    name: ex.name,
+    name: toTitleCase(ex.name),
     category: ex.category || ex.bodyPart,
     equipment: ex.equipment,
     primaryMuscles: ex.target ? [normalizeMuscle(ex.target)] : [],
@@ -113,9 +119,6 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
     else if (name.startsWith(q + " ") || name.startsWith(q + "-")) score += 120;
     else if (name.includes(q)) score += 60;
 
-    // Canonical source bonus
-    if (ex.id.startsWith("canonical-")) score += 80;
-
     // Token matches with whole-word matching
     let matchedTokens = 0;
     for (const token of queryTokens) {
@@ -127,6 +130,16 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
         score += 10;
       }
     }
+
+    // Critical: If candidate has 0 matched tokens and is NOT an exact/prefix/substring match,
+    // it has zero relevance to the query. Never award scores or canonical bonuses!
+    const hasNameMatch = score > 0;
+    if (matchedTokens === 0 && !hasNameMatch) {
+      return { ex, score: 0 };
+    }
+
+    // Canonical source bonus (only for actual matches)
+    if (ex.id.startsWith("canonical-")) score += 80;
 
     if (matchedTokens === queryTokens.length) {
       score += 40; // All query words matched exactly

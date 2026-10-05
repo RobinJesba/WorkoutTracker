@@ -726,6 +726,7 @@ export const EXERCISE_NAMES: string[] = [
   "Squat Thrust",
   "Squats",
   "Squats on Multipress",
+  "Stair Climber",
   "Stair Master",
   "Standing Adduction (Cable)",
   "Standing Bicep Curl",
@@ -741,6 +742,7 @@ export const EXERCISE_NAMES: string[] = [
   "Standing biceps stretch left",
   "Standing biceps stretch right",
   "Stationary Bike",
+  "Step Climber",
   "Step-ups",
   "Stiff-legged Deadlifts",
   "Straddle L-Sit",
@@ -1539,7 +1541,7 @@ export const EXERCISE_NAMES: string[] = [
   "dumbbell single leg deadlift with stepbox support",
   "dumbbell single leg split squat",
   "dumbbell single leg squat",
-  "dumbbell squat",
+  "Dumbbell Squat",
   "dumbbell standing alternate hammer curl and press",
   "dumbbell standing alternate overhead press",
   "dumbbell standing alternate raise",
@@ -2167,6 +2169,7 @@ export const EXERCISE_NAMES: string[] = [
   "wind sprints",
   "world greatest stretch",
   "wrist circles",
-  "wrist rollerer"
 ];
-export const EXERCISE_CATALOG_TEXT: string = EXERCISE_NAMES.join("\n");
+export const EXERCISE_CATALOG_TEXT: string = Array.from(
+  new Set(EXERCISE_NAMES.map((n) => n.replace(/\b[a-z]/g, (c) => c.toUpperCase())))
+).join("\n");
