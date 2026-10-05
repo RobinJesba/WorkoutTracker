@@ -76,6 +76,25 @@ export const ALL_EXERCISES: UnifiedExercise[] = [
   })),
 ];
 
+const QUERY_STOP_WORDS = new Set([
+  "for", "with", "at", "and", "the", "a", "an", "on", "in", "to", "of",
+  "mins", "min", "minutes", "minute", "hr", "hrs", "hour", "hours", "sec", "secs", "seconds",
+  "km", "km/h", "km/hr", "kmh", "mph", "reps", "rep", "sets", "set", "speed", "level"
+]);
+
+function extractQueryTokens(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/[\s,–—:>]+/)
+    .map((t) => t.replace(/[^a-z0-9]/g, ""))
+    .filter(
+      (t) =>
+        t.length > 0 &&
+        !QUERY_STOP_WORDS.has(t) &&
+        !/^\d+(\.\d+)?(km|kmh|mph|min|mins|kg|lbs|%)?$/.test(t)
+    );
+}
+
 /**
  * Fast search across the combined exercise database with anti-collision movement rules.
  */
@@ -98,7 +117,7 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
     return [canonicalMatch];
   }
 
-  const queryTokens = q.split(/\s+/).filter((t) => t.length > 0);
+  const queryTokens = extractQueryTokens(q);
   const qNorm = q.replace(/[^a-z0-9]/g, "");
 
   // Movement category intention in query
@@ -107,6 +126,9 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
   const qHasDeadlift = /\bdeadlifts?\b|\brdl\b/i.test(q);
   const qHasPress = /\bpress(es)?\b|\bpush-?ups?\b|\bdips?\b/i.test(q);
   const qHasPull = /\bpulls?\b|\bpulldowns?\b|\brows?\b|\bchin-?ups?\b/i.test(q);
+  const qHasTreadmill = /\btreadmill\b/i.test(q);
+  const qHasCardio = /\b(treadmill|walk|walking|walks|run|running|runs|jog|jogging|sprint|sprints|cardio|climber|stair|stepper|elliptical|cycling|bike)\b/i.test(q);
+  const qHasIncline = /\bincline\b/i.test(q);
 
   const scored = ALL_EXERCISES.map((ex) => {
     const name = ex.name.toLowerCase();
@@ -126,7 +148,7 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
       if (regex.test(name)) {
         score += 25;
         matchedTokens++;
-      } else if (name.includes(token)) {
+      } else if (name.includes(token) && token.length >= 4) {
         score += 10;
       }
     }
@@ -141,7 +163,7 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
     // Canonical source bonus (only for actual matches)
     if (ex.id.startsWith("canonical-")) score += 80;
 
-    if (matchedTokens === queryTokens.length) {
+    if (matchedTokens === queryTokens.length && queryTokens.length > 0) {
       score += 40; // All query words matched exactly
     }
 
@@ -150,8 +172,33 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
     const lengthDiff = Math.abs(nameWords.length - queryTokens.length);
     score -= lengthDiff * 6;
 
+    // Incline alignment
+    if (qHasIncline) {
+      if (/\bincline\b/i.test(name)) score += 60;
+      else score -= 40;
+    }
+
+    // Treadmill alignment
+    if (qHasTreadmill) {
+      if (/\btreadmill\b/i.test(name)) score += 150;
+      else score -= 200;
+    }
+
+    // Critical: If candidate is a LUNGE, but query does NOT specify lunge, heavily penalize
+    if (!qHasLunge && /\blunges?\b/i.test(name)) {
+      score -= 350;
+    }
+
     // Movement collision anti-patterns
-    // 1. If searching for SQUAT, heavily penalize exercises with ROW, CURL, PRESS, JERK
+    // 1. If searching for CARDIO, heavily penalize PRESS, SQUAT, DEADLIFT, ROW
+    if (qHasCardio) {
+      if (!qHasPress && /\b(press(es)?|bench|push-?ups?|dips?)\b/i.test(name)) score -= 400;
+      if (!qHasSquat && /\bsquats?\b/i.test(name)) score -= 400;
+      if (!qHasDeadlift && /\b(deadlifts?|rdl)\b/i.test(name)) score -= 400;
+      if (!qHasPull && /\b(row|rows|rowing|pulldown|pulldowns|chin-?ups?|pull-?ups?)\b/i.test(name)) score -= 400;
+    }
+
+    // 2. If searching for SQUAT, heavily penalize exercises with ROW, CURL, PRESS, JERK
     if (qHasSquat) {
       if (/\brow(ing|s)?\b/i.test(name)) score -= 300;
       if (/\bjerk\b/i.test(name)) score -= 200;
@@ -163,7 +210,7 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
       }
     }
 
-    // 2. If searching for LUNGE, penalize ROW, CURL, PRESS
+    // 3. If searching for LUNGE, penalize ROW, CURL, PRESS
     if (qHasLunge) {
       if (/\brow(ing|s)?\b/i.test(name)) score -= 300;
       if (/\bcurl(s)?\b/i.test(name)) score -= 250;
@@ -172,17 +219,17 @@ export function searchUnifiedExercises(query: string, limit = 10): UnifiedExerci
       }
     }
 
-    // 3. If searching for PRESS / PUSH, penalize PULL / ROW
+    // 4. If searching for PRESS / PUSH, penalize PULL / ROW
     if (qHasPress && !qHasPull) {
       if (/\brow(ing|s)?\b|\bpulldowns?\b/i.test(name)) score -= 300;
     }
 
-    // 4. If searching for PULL / ROW, penalize PRESS / PUSH
+    // 5. If searching for PULL / ROW, penalize PRESS / PUSH
     if (qHasPull && !qHasPress) {
       if (/\bpress(es)?\b|\bpush-?ups?\b/i.test(name)) score -= 300;
     }
 
-    // 5. If searching for DEADLIFT, must not be bicep/tricep/chest
+    // 6. If searching for DEADLIFT, must not be bicep/tricep/chest
     if (qHasDeadlift) {
       if (ex.primaryMuscles.includes("Chest") || ex.primaryMuscles.includes("Biceps") || ex.primaryMuscles.includes("Triceps")) {
         score -= 400;
