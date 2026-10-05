@@ -138,12 +138,41 @@ Parsed:
   "secondaryMuscles": ["Hamstrings", "Core"]
 }
 
+Example 10 (Cardio - Incline Treadmill Walk):
+Input: "Treadmill walk for 10mins at 4km/hr with 3% incline"
+Parsed:
+{
+  "name": "Incline Treadmill Walk",
+  "details": "10 mins @ 4 km/h (3% incline)",
+  "isCustom": false,
+  "primaryMuscles": ["Calves", "Hamstrings", "Glutes"],
+  "secondaryMuscles": ["Quads", "Core"]
+}
+
+Example 11 (Cardio - Treadmill Walk):
+Input: "Treadmill walk 20 mins @ 5km/h"
+Parsed:
+{
+  "name": "Treadmill Walk",
+  "details": "20 mins @ 5 km/h",
+  "isCustom": false,
+  "primaryMuscles": ["Calves", "Quads"],
+  "secondaryMuscles": ["Hamstrings", "Glutes", "Core"]
+}
+
 ### TITLE DETERMINATION GUIDELINES:
 1. For a brand new workout: Infer a concise, professional title (e.g. "Upper Body Pull & Push", "Leg Day & Intervals", "Chest & Shoulders", "Full Body Circuit").
 2. If existing workout context for the date is provided:
    - Review ALL exercises for the day (Existing Completed Exercises + New Exercises).
    - If the existing title already accurately and adequately summarizes the entire session, KEEP the existing title unchanged.
    - If the new exercises change, broaden, or shift the focus of the workout (e.g., adding cardio intervals to an upper body push; adding leg squats to chest; expanding into a full body session), return an updated, concise, professional title.
+3. Cardio & Warm-Up / Cool-Down Title Guidelines:
+   - Do NOT append "& Cardio" to a strength workout title if the cardio consists merely of brief, low-intensity warm-up or cool-down activities (e.g., <= 15 minutes of light walking, incline treadmill walk, or brief stepper/bike alongside a primary strength session).
+   - In strength sessions (like squats, leg curls, presses, rows), keep the title focused on the primary muscular training stimulus (e.g. "Lower Body & Core" rather than "Lower Body, Core & Cardio").
+   - ONLY include "Cardio", "Running", or "Intervals" in the title if:
+     a) It is high-intensity / interval running (e.g. HIIT, sprint intervals), OR
+     b) It is a dedicated endurance cardio block (>= 20-30 minutes), OR
+     c) Cardio is the sole or dominant focus of the workout.
 
 ### TITLE UPDATE FEW-SHOT EXAMPLES:
 
@@ -175,6 +204,13 @@ New Exercises to Add: Hanging Leg Raises, Ab Wheel Rollouts, Plank
 Combined Day Focus: Back pull workout plus dedicated abdominal core finisher.
 Title: "Back Pull & Core"
 
+Title Example 5 (Warm-up / cool-down walk alongside strength -> Do NOT add Cardio to title):
+Existing Title: "Lower Body & Core"
+Existing Exercises: Stair Climber (10 mins), Plank, Glute Bridge, Dumbbell Squat, Leg Extensions, Leg Curls
+New Exercises to Add: Incline Treadmill Walk for 10mins at 4km/hr with 3% incline
+Combined Day Focus: Heavy lower body hypertrophy and core strength. The brief walks/steps are warm-up/cool-down.
+Title: "Lower Body & Core"
+
 OUTPUT FORMAT:
 Return ONLY valid JSON (no markdown formatting, no backticks, no comments) with this structure:
 {
@@ -199,12 +235,24 @@ function fallbackLocalParse(text: string, existingTitle?: string) {
     .filter((l) => l.length > 2 && !l.startsWith("#"));
 
   const items = lines.map((line, idx) => {
-    // Split on dash, arrow, or colon
-    const parts = line.split(/[-–—:>]/);
-    const rawName = (parts[0] || line).trim();
-    const rawDetails = (parts.slice(1).join(" ") || line).trim();
+    let rawName = line;
+    let rawDetails = line;
 
-    const match = findUnifiedExercise(rawName);
+    // Split on dash, arrow, colon, or natural language measurement marker
+    if (/[-–—:>]/.test(line)) {
+      const parts = line.split(/[-–—:>]/);
+      rawName = (parts[0] || line).trim();
+      rawDetails = (parts.slice(1).join(" ") || line).trim();
+    } else {
+      const splitMatch = line.match(/^(.*?\b(?:walk|walking|run|running|sprint|climber|squat|press|pull|curl|deadlift))\s+(?:for\s+)?(\d+[\s\S]*)$/i);
+      if (splitMatch) {
+        rawName = splitMatch[1].trim();
+        rawDetails = splitMatch[2].trim();
+      }
+    }
+
+    // Try matching full line first to capture attributes like "incline", else match extracted name
+    const match = findUnifiedExercise(line) || findUnifiedExercise(rawName);
     const name = match ? match.name : rawName;
     const primaryMuscles = match ? match.primaryMuscles : ["Full-body"];
     const secondaryMuscles = match ? match.secondaryMuscles : [];
