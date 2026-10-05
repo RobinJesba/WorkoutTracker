@@ -9,7 +9,7 @@
     "lint": "eslint",
     "build:worker": "opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && wrangler dev",
-    "deploy": "opennextjs-cloudflare build && OPEN_NEXT_DEPLOY=true wrangler deploy",
+    "deploy": "opennextjs-cloudflare build && OPEN_NEXT_DEPLOY=true wrangler deploy --keep-vars",
     "db:setup:local": "wrangler d1 execute workout-tracker-db --local --file=src/data/schema.sql",
     "db:setup:remote": "wrangler d1 execute workout-tracker-db --remote --file=src/data/schema.sql"
   },

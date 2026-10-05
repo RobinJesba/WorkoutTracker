@@ -9,6 +9,46 @@ import { WorkoutEntry } from "@/types/workout";
 
 export const dynamic = "force-dynamic";
 
+// Helper to retrieve configured admin emails from environment or Cloudflare context
+async function getAdminEmails(): Promise<string[]> {
+  let adminEmails = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "";
+
+  if (!adminEmails) {
+    try {
+      const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+      const { env } = (await getCloudflareContext({ async: true })) as any;
+      adminEmails = env?.ADMIN_EMAILS || env?.ADMIN_EMAIL || "";
+    } catch {
+      // ignore
+    }
+  }
+
+  return adminEmails
+    .split(",")
+    .map((e: string) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+// Compute whether the current request is from an admin or read-only viewer
+async function getAccessStatus(req: NextRequest): Promise<{ isAdmin: boolean; isReadOnly: boolean }> {
+  const adminList = await getAdminEmails();
+
+  // If no admin emails are configured at all, maintain full access for backward compatibility
+  if (adminList.length === 0) {
+    return { isAdmin: true, isReadOnly: false };
+  }
+
+  const cfUserEmail = req.headers.get("cf-access-authenticated-user-email")?.trim().toLowerCase();
+
+  // In local development when not behind Cloudflare Access, allow full access
+  if (process.env.NODE_ENV === "development" && !cfUserEmail) {
+    return { isAdmin: true, isReadOnly: false };
+  }
+
+  const isAdmin = Boolean(cfUserEmail && adminList.includes(cfUserEmail));
+  return { isAdmin, isReadOnly: !isAdmin };
+}
+
 // Strict API Key or Cloudflare Access authorization
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   // 1. Local development convenience
@@ -17,8 +57,12 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
   }
 
   // 2. Cloudflare Zero Trust Access: Authenticated via Google OAuth
-  const cfUserEmail = req.headers.get("cf-access-authenticated-user-email");
+  const cfUserEmail = req.headers.get("cf-access-authenticated-user-email")?.trim().toLowerCase();
   if (cfUserEmail) {
+    const adminList = await getAdminEmails();
+    if (adminList.length > 0) {
+      return adminList.includes(cfUserEmail);
+    }
     return true;
   }
 
@@ -45,12 +89,13 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
 }
 
 // 1. GET: Read all workouts (with Edge Caching headers)
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const workouts = await getWorkouts();
+    const { isReadOnly } = await getAccessStatus(req);
 
     return NextResponse.json(
-      { workouts },
+      { workouts, isReadOnly },
       {
         status: 200,
         headers: {

@@ -14,12 +14,16 @@ export default function WorkoutListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWorkout, setEditingWorkout] = useState<WorkoutEntry | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
 
   const loadWorkouts = async () => {
     try {
       const res = await fetch("/api/workouts");
       if (res.ok) {
         const data = await res.json();
+        if (typeof data.isReadOnly === "boolean") {
+          setIsReadOnly(data.isReadOnly);
+        }
         if (Array.isArray(data.workouts)) {
           setWorkouts(
             data.workouts.map((w: WorkoutEntry) => ({
@@ -178,9 +182,14 @@ export default function WorkoutListPage() {
                     </time>
                   </div>
                   <button
-                    onClick={() => setEditingWorkout(workout)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono text-zinc-400 hover:text-emerald-400 bg-zinc-950/60 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-emerald-500/30 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
-                    title="Manual edit workout"
+                    onClick={() => !isReadOnly && setEditingWorkout(workout)}
+                    disabled={isReadOnly}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all shrink-0 shadow-sm ${
+                      isReadOnly
+                        ? "text-zinc-600 bg-zinc-950/40 border border-zinc-800/40 cursor-not-allowed opacity-50 pointer-events-none"
+                        : "text-zinc-400 hover:text-emerald-400 bg-zinc-950/60 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-emerald-500/30 cursor-pointer active:scale-95"
+                    }`}
+                    title={isReadOnly ? "Editing is disabled in view-only mode" : "Manual edit workout"}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
@@ -265,6 +274,7 @@ export default function WorkoutListPage() {
         onClose={() => setIsModalOpen(false)}
         onWorkoutSaved={handleWorkoutSaved}
         existingWorkouts={workouts}
+        isReadOnly={isReadOnly}
       />
 
       {/* Manual Edit Workout Modal */}

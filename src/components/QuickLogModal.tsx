@@ -10,6 +10,7 @@ interface QuickLogModalProps {
   onClose: () => void;
   onWorkoutSaved: (workout: WorkoutEntry, isMerged?: boolean) => void;
   existingWorkouts?: WorkoutEntry[];
+  isReadOnly?: boolean;
 }
 
 const NOTES_PLACEHOLDER = `Dumbbell chest press - 10kg * 6, 7.5kg * 12, 7.5 * 10
@@ -22,6 +23,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   onClose,
   onWorkoutSaved,
   existingWorkouts = [],
+  isReadOnly = false,
 }) => {
   const [selectedDateIso, setSelectedDateIso] = useState<string>(getTodayIso());
   const [rawText, setRawText] = useState<string>("");
@@ -53,6 +55,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   const existingWorkoutForDate = existingWorkouts.find((w) => isSameWorkoutDay(w.date, displayDate));
 
   const handleSubmit = async () => {
+    if (isReadOnly) return;
     if (!rawText.trim()) {
       setParseError("Please enter your workout notes first.");
       return;
@@ -94,6 +97,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (isReadOnly) return;
     if (!parsedItems || parsedItems.length === 0) {
       setSaveError("No items to save.");
       return;
@@ -364,8 +368,13 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isParsing || !rawText.trim()}
-              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-zinc-950 disabled:text-zinc-500 font-semibold px-4 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 disabled:pointer-events-none cursor-pointer"
+              disabled={isParsing || !rawText.trim() || isReadOnly}
+              className={`flex items-center gap-1.5 font-semibold px-4 py-2 rounded-lg text-xs transition-all shadow-md ${
+                isReadOnly
+                  ? "bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-60 pointer-events-none"
+                  : "bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-zinc-950 disabled:text-zinc-500 cursor-pointer active:scale-95 disabled:pointer-events-none"
+              }`}
+              title={isReadOnly ? "Submitting is disabled in view-only mode" : undefined}
             >
               {isParsing ? (
                 <>
@@ -385,8 +394,13 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving || parsedItems.length === 0}
-              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-zinc-950 disabled:text-zinc-500 font-semibold px-4 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 disabled:pointer-events-none cursor-pointer"
+              disabled={isSaving || parsedItems.length === 0 || isReadOnly}
+              className={`flex items-center gap-1.5 font-semibold px-4 py-2 rounded-lg text-xs transition-all shadow-md ${
+                isReadOnly
+                  ? "bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-60 pointer-events-none"
+                  : "bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 text-zinc-950 disabled:text-zinc-500 cursor-pointer active:scale-95 disabled:pointer-events-none"
+              }`}
+              title={isReadOnly ? "Saving is disabled in view-only mode" : undefined}
             >
               {isSaving ? (
                 <>
