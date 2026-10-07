@@ -10,7 +10,7 @@ import { WorkoutEntry } from "@/types/workout";
 export const dynamic = "force-dynamic";
 
 // Helper to retrieve configured admin emails from environment or Cloudflare context
-async function getAdminEmails(): Promise<string[]> {
+export async function getAdminEmails(): Promise<string[]> {
   let adminEmails = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "";
 
   if (!adminEmails) {
@@ -29,24 +29,55 @@ async function getAdminEmails(): Promise<string[]> {
     .filter(Boolean);
 }
 
-// Compute whether the current request is from an admin or read-only viewer
-async function getAccessStatus(req: NextRequest): Promise<{ isAdmin: boolean; isReadOnly: boolean }> {
-  const adminList = await getAdminEmails();
+// Helper to retrieve configured trainer emails from environment or Cloudflare context
+export async function getTrainerEmails(): Promise<string[]> {
+  let trainerEmails = process.env.TRAINER_EMAILS || process.env.TRAINER_EMAIL || "";
 
-  // If no admin emails are configured at all, maintain full access for backward compatibility
-  if (adminList.length === 0) {
-    return { isAdmin: true, isReadOnly: false };
+  if (!trainerEmails) {
+    try {
+      const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+      const { env } = (await getCloudflareContext({ async: true })) as any;
+      trainerEmails = env?.TRAINER_EMAILS || env?.TRAINER_EMAIL || "";
+    } catch {
+      // ignore
+    }
   }
+
+  return trainerEmails
+    .split(",")
+    .map((e: string) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+// Compute whether the current request is from an admin, trainer, or read-only viewer
+export async function getAccessStatus(req: NextRequest): Promise<{ isAdmin: boolean; isTrainer: boolean; isReadOnly: boolean }> {
+  const adminList = await getAdminEmails();
+  const trainerList = await getTrainerEmails();
 
   const cfUserEmail = req.headers.get("cf-access-authenticated-user-email")?.trim().toLowerCase();
 
-  // In local development when not behind Cloudflare Access, allow full access
+  // In local development when not behind Cloudflare Access
   if (process.env.NODE_ENV === "development" && !cfUserEmail) {
-    return { isAdmin: true, isReadOnly: false };
+    const mockRole = req.headers.get("x-mock-role");
+    if (mockRole === "trainer") {
+      return { isAdmin: false, isTrainer: true, isReadOnly: true };
+    }
+    if (mockRole === "viewer") {
+      return { isAdmin: false, isTrainer: false, isReadOnly: true };
+    }
+    return { isAdmin: true, isTrainer: false, isReadOnly: false };
+  }
+
+  // If no admin emails and no trainer emails are configured at all, maintain full access for backward compatibility
+  if (adminList.length === 0 && trainerList.length === 0) {
+    return { isAdmin: true, isTrainer: false, isReadOnly: false };
   }
 
   const isAdmin = Boolean(cfUserEmail && adminList.includes(cfUserEmail));
-  return { isAdmin, isReadOnly: !isAdmin };
+  const isTrainer = Boolean(cfUserEmail && trainerList.includes(cfUserEmail));
+  const isReadOnly = !isAdmin;
+
+  return { isAdmin, isTrainer, isReadOnly };
 }
 
 // Strict API Key or Cloudflare Access authorization
@@ -92,10 +123,10 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
 export async function GET(req: NextRequest) {
   try {
     const workouts = await getWorkouts();
-    const { isReadOnly } = await getAccessStatus(req);
+    const { isAdmin, isTrainer, isReadOnly } = await getAccessStatus(req);
 
     return NextResponse.json(
-      { workouts, isReadOnly },
+      { workouts, isReadOnly, isAdmin, isTrainer },
       {
         status: 200,
         headers: {

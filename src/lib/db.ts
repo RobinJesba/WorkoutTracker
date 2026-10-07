@@ -249,3 +249,61 @@ export async function deleteWorkout(id: string): Promise<{ success: boolean }> {
   await db.prepare("DELETE FROM workouts WHERE id = ?").bind(id).run();
   return { success: true };
 }
+
+// Ensure trainer_notes table exists
+async function ensureTrainerNotesTable(db: any) {
+  try {
+    await db.prepare(
+      "CREATE TABLE IF NOT EXISTS trainer_notes (id TEXT PRIMARY KEY, content TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+    ).run();
+  } catch {
+    // ignore
+  }
+}
+
+// 5. GET TRAINER NOTES
+export async function getTrainerNotes(): Promise<string> {
+  try {
+    const { db } = await getDB();
+    if (db) {
+      await ensureTrainerNotesTable(db);
+      const res = await db.prepare(
+        "SELECT content FROM trainer_notes WHERE id = 'default' LIMIT 1"
+      ).all();
+      const row = res.results?.[0] as { content: string } | undefined;
+      return row?.content || "";
+    }
+  } catch (error) {
+    console.error("Error reading trainer notes from D1:", error);
+  }
+  return "";
+}
+
+// 6. SAVE TRAINER NOTES
+export async function saveTrainerNotes(content: string): Promise<{ success: boolean }> {
+  const { db } = await getDB();
+  if (!db) {
+    throw new Error("Cloudflare D1 database is not connected.");
+  }
+
+  await ensureTrainerNotesTable(db);
+  await db.prepare(
+    "INSERT INTO trainer_notes (id, content, updated_at) VALUES ('default', ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = CURRENT_TIMESTAMP"
+  ).bind(content).run();
+
+  return { success: true };
+}
+
+// 7. CLEAR TRAINER NOTES
+export async function clearTrainerNotes(): Promise<{ success: boolean }> {
+  const { db } = await getDB();
+  if (!db) {
+    throw new Error("Cloudflare D1 database is not connected.");
+  }
+
+  await ensureTrainerNotesTable(db);
+  await db.prepare("DELETE FROM trainer_notes WHERE id = 'default'").run();
+
+  return { success: true };
+}
+

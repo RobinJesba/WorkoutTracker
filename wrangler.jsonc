@@ -6,7 +6,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
   "vars": {
-    "ADMIN_EMAILS": "jb.robinm@gmail.com"
+    "ADMIN_EMAILS": "jb.robinm@gmail.com",
+    "TRAINER_EMAILS": "shibindhas98@gmail.com"
   },
   "assets": {
     "directory": ".open-next/assets",

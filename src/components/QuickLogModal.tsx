@@ -238,7 +238,6 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-mono text-zinc-400">Workout Notes</label>
-                <span className="text-[11px] font-mono text-zinc-500">Paste your raw log</span>
               </div>
               <textarea
                 value={rawText}
